@@ -1,5 +1,6 @@
 name: FastAPI CI/CD
 
+
 on:
   push:
     branches: [ "main" ]
