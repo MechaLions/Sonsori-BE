@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
 COPY ./app /app/app
 COPY ./mecalions /app/mecalions
 COPY ./models /app/models
-COPY ./webSocket /app/webSocket
+
 
 # .env 파일 복사
 COPY .env /app/.env
