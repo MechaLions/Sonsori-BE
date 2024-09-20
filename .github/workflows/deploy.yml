@@ -52,7 +52,7 @@ jobs:
           docker stop fastapi-app
           docker rm fastapi-app
           docker image rm ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKERHUB_REPONAME }}
-          docker run -d -p 8000:8000 \
+          docker run -d -p 80:8000 \
           -v /root/my-proj/resources/images:/app/media \
           -v /root/my-proj/resources/static:/app/static \
           --name fastapi-app ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKERHUB_REPONAME }}
