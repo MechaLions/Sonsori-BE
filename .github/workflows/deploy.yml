@@ -46,7 +46,7 @@ jobs:
       with:
         host: ${{ secrets.SSH_HOST }}
         username: ubuntu
-        key: ${{ secrets.SSH_PRIVATE_KEY }
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           docker stop fastapi-app
           docker rm fastapi-app
