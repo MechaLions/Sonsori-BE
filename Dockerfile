@@ -12,8 +12,6 @@ RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
 # 필요한 파일들을 복사
 COPY ./app /app/app
 COPY ./mecalions /app/mecalions
-COPY ./models /app/models
-
 
 # .env 파일 복사
 COPY .env /app/.env
