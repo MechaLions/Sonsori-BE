@@ -50,34 +50,61 @@ def hash_password(password: str):
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-# 아이디 중복 확인 API (경로 변경 및 결과값 변경)
+# 아이디 중복 확인 API (CONFLICT, 409 반환)
 @app.get("/checkIdDuplicate/{user_login_id}", 
          summary="아이디 중복 확인", 
          tags=["유저 API"],
          responses={
-             200: {"description": "사용 가능한 아이디입니다."},
-             400: {"description": "아이디가 이미 존재합니다."}
+             200: {
+                 "description": "OK",
+                 "content": {
+                     "application/json": {
+                         "example": {"message": "사용 가능한 아이디입니다."}
+                     }
+                 }
+             },
+             409: {
+                 "description": "CONFLICT",
+                 "content": {
+                     "application/json": {
+                         "example": {"message": "아이디가 이미 존재합니다."}
+                     }
+                 }
+             }
          })
 def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.user_login_id == user_login_id).first()
     if db_user:
-        raise HTTPException(status_code=400, detail={"message": "아이디가 이미 존재합니다."})
+        raise HTTPException(status_code=409, detail={"message": "아이디가 이미 존재합니다."})
     return {"message": "사용 가능한 아이디입니다."}
 
-# 회원가입 엔드포인트 (에러 응답 형식 변경)
+# 회원가입 엔드포인트 (CONFLICT, 409 반환)
 @app.post("/register", 
           response_model=UserResponse, 
           summary="회원가입", 
           tags=["유저 API"], 
           responses={
-              200: {"description": "회원가입 성공"},
-              400: {"description": "아이디가 이미 존재합니다."},
-              422: {"description": "유효성 검사 실패"}
+              200: {
+                  "description": "OK",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "회원가입 성공"}
+                      }
+                  }
+              },
+              409: {
+                  "description": "CONFLICT",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "아이디가 이미 존재합니다."}
+                      }
+                  }
+              }
           })
 def register(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.user_login_id == user.user_login_id).first()
     if db_user:
-        raise HTTPException(status_code=400, detail={"message": "아이디가 이미 존재합니다."})
+        raise HTTPException(status_code=409, detail={"message": "아이디가 이미 존재합니다."})
 
     hashed_password = hash_password(user.user_login_password)
     
@@ -91,24 +118,38 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return new_user
 
-# 로그인 엔드포인트 (에러 응답 형식 변경)
+# 로그인 엔드포인트 (NOT FOUND, 404 반환)
 @app.post("/login", 
           response_model=UserResponse, 
           summary="로그인", 
           tags=["유저 API"], 
           description="로그인을 통해 사용자를 인증합니다.",
           responses={
-              200: {"description": "로그인 성공"},
-              400: {"description": "아이디 또는 비밀번호가 잘못되었습니다."}
+              200: {
+                  "description": "OK",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "로그인 성공"}
+                      }
+                  }
+              },
+              404: {
+                  "description": "NOT FOUND",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "아이디 또는 비밀번호가 잘못되었습니다."}
+                      }
+                  }
+              }
           })
 def login(user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.user_login_id == user.user_login_id).first()
 
     if not db_user:
-        raise HTTPException(status_code=400, detail={"message": "아이디가 존재하지 않습니다."})
+        raise HTTPException(status_code=404, detail={"message": "아이디가 존재하지 않습니다."})
 
     if not verify_password(user.user_login_password, db_user.user_login_password):
-        raise HTTPException(status_code=400, detail={"message": "비밀번호가 일치하지 않습니다."})
+        raise HTTPException(status_code=404, detail={"message": "비밀번호가 일치하지 않습니다."})
 
     return db_user
 
