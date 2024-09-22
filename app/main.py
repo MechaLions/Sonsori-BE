@@ -50,8 +50,8 @@ def hash_password(password: str):
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-# 아이디 중복 확인 API
-@app.get("/check-id-duplicate/{user_login_id}", 
+# 아이디 중복 확인 API (경로 변경 및 결과값 변경)
+@app.get("/checkIdDuplicate/{user_login_id}", 
          summary="아이디 중복 확인", 
          tags=["유저 API"],
          responses={
@@ -61,10 +61,10 @@ def verify_password(plain_password, hashed_password):
 def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.user_login_id == user_login_id).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="아이디가 이미 존재합니다.")
+        raise HTTPException(status_code=400, detail={"message": "아이디가 이미 존재합니다."})
     return {"message": "사용 가능한 아이디입니다."}
 
-# 회원가입 엔드포인트
+# 회원가입 엔드포인트 (에러 응답 형식 변경)
 @app.post("/register", 
           response_model=UserResponse, 
           summary="회원가입", 
@@ -77,7 +77,7 @@ def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
 def register(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.user_login_id == user.user_login_id).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="아이디가 이미 존재합니다.")
+        raise HTTPException(status_code=400, detail={"message": "아이디가 이미 존재합니다."})
 
     hashed_password = hash_password(user.user_login_password)
     
@@ -91,7 +91,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return new_user
 
-# 로그인 엔드포인트
+# 로그인 엔드포인트 (에러 응답 형식 변경)
 @app.post("/login", 
           response_model=UserResponse, 
           summary="로그인", 
@@ -105,13 +105,14 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.user_login_id == user.user_login_id).first()
 
     if not db_user:
-        raise HTTPException(status_code=400, detail="아이디가 존재하지 않습니다.")
+        raise HTTPException(status_code=400, detail={"message": "아이디가 존재하지 않습니다."})
 
     if not verify_password(user.user_login_password, db_user.user_login_password):
-        raise HTTPException(status_code=400, detail="비밀번호가 일치하지 않습니다.")
+        raise HTTPException(status_code=400, detail={"message": "비밀번호가 일치하지 않습니다."})
 
     return db_user
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", port=8000, reload=True)
+
