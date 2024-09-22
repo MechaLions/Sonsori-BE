@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException, Depends, status
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from .database import engine, get_db
@@ -41,6 +43,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 커스텀 422 에러 핸들러
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"message": "입력값이 유효하지 않습니다.", "details": exc.errors()},
+    )
 
 # 패스워드 해싱 함수
 def hash_password(password: str):
@@ -99,6 +109,14 @@ def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
                           "example": {"message": "아이디가 이미 존재합니다."}
                       }
                   }
+              },
+              422: {
+                  "description": "VALIDATION ERROR",  # 상태 설명을 대문자로 변경
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "입력값이 유효하지 않습니다."}
+                      }
+                  }
               }
           })
 def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -138,6 +156,14 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
                   "content": {
                       "application/json": {
                           "example": {"message": "아이디 또는 비밀번호가 잘못되었습니다."}
+                      }
+                  }
+              },
+              422: {
+                  "description": "VALIDATION ERROR",  # 상태 설명을 대문자로 변경
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "입력값이 유효하지 않습니다."}
                       }
                   }
               }
