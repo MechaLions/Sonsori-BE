@@ -51,7 +51,13 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 # 아이디 중복 확인 API
-@app.get("/check-id-duplicate/{user_login_id}", summary="아이디 중복 확인", tags=["유저 API"])
+@app.get("/check-id-duplicate/{user_login_id}", 
+         summary="아이디 중복 확인", 
+         tags=["유저 API"],
+         responses={
+             200: {"description": "사용 가능한 아이디입니다."},
+             400: {"description": "아이디가 이미 존재합니다."}
+         })
 def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.user_login_id == user_login_id).first()
     if db_user:
@@ -59,7 +65,15 @@ def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
     return {"message": "사용 가능한 아이디입니다."}
 
 # 회원가입 엔드포인트
-@app.post("/register", response_model=UserResponse, summary="회원가입", tags=["유저 API"])
+@app.post("/register", 
+          response_model=UserResponse, 
+          summary="회원가입", 
+          tags=["유저 API"], 
+          responses={
+              200: {"description": "회원가입 성공"},
+              400: {"description": "아이디가 이미 존재합니다."},
+              422: {"description": "유효성 검사 실패"}
+          })
 def register(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.user_login_id == user.user_login_id).first()
     if db_user:
@@ -78,7 +92,15 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 # 로그인 엔드포인트
-@app.post("/login", response_model=UserResponse, summary="로그인",tags=["유저 API"], description="로그인을 통해 사용자를 인증합니다.")
+@app.post("/login", 
+          response_model=UserResponse, 
+          summary="로그인", 
+          tags=["유저 API"], 
+          description="로그인을 통해 사용자를 인증합니다.",
+          responses={
+              200: {"description": "로그인 성공"},
+              400: {"description": "아이디 또는 비밀번호가 잘못되었습니다."}
+          })
 def login(user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.user_login_id == user.user_login_id).first()
 
