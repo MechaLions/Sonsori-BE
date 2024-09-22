@@ -25,7 +25,7 @@ tags_metadata = [
 # FastAPI 앱 생성
 app = FastAPI(
     title="MecaLions",
-    description="수어 번역 및 음석 번역 서비스 API 문서",
+    description="수어 번역 및 음성 번역 서비스 API 문서",
     version="1.0.0",
     openapi_tags=tags_metadata
 )
@@ -96,7 +96,7 @@ def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail={"message": "아이디가 이미 존재합니다."})
     return {"message": "사용 가능한 아이디입니다."}
 
-# 회원가입 엔드포인트 (CONFLICT, 409 반환, 422 설명 변경)
+# 회원가입 엔드포인트 (user 객체 반환 및 example value 통일)
 @app.post("/register", 
           response_model=UserResponse, 
           summary="회원가입", 
@@ -106,7 +106,11 @@ def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
                   "description": "OK",
                   "content": {
                       "application/json": {
-                          "example": {"message": "회원가입 성공"}
+                          "example": {
+                              "user_id": 1,
+                              "user_login_id": "example_id",
+                              "name": "example_name"
+                          }
                       }
                   }
               },
@@ -137,14 +141,14 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     new_user = User(
         user_login_id=user.user_login_id,
         user_login_password=hashed_password,
-        name=user.name  # name 필드 추가
+        name=user.name
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     return new_user
 
-# 로그인 엔드포인트 (NOT FOUND, 404 반환, 422 설명 변경)
+# 로그인 엔드포인트 (user 객체 반환 및 example value 통일)
 @app.post("/login", 
           response_model=UserResponse, 
           summary="로그인", 
@@ -155,7 +159,11 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
                   "description": "OK",
                   "content": {
                       "application/json": {
-                          "example": {"message": "로그인 성공"}
+                          "example": {
+                              "user_id": 1,
+                              "user_login_id": "example_id",
+                              "name": "example_name"
+                          }
                       }
                   }
               },
@@ -190,3 +198,4 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", port=8000, reload=True)
+
