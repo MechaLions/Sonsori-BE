@@ -50,24 +50,27 @@ def hash_password(password: str):
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
+# 아이디 중복 확인 API
+@app.get("/check-id-duplicate/{user_login_id}", summary="아이디 중복 확인", tags=["유저 API"])
+def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.user_login_id == user_login_id).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="아이디가 이미 존재합니다.")
+    return {"message": "사용 가능한 아이디입니다."}
+
 # 회원가입 엔드포인트
-@app.post("/register", response_model=UserResponse, summary="회원가입",tags=["유저 API"], description="새로운 사용자를 등록합니다.")
+@app.post("/register", response_model=UserResponse, summary="회원가입", tags=["유저 API"])
 def register(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.user_login_id == user.user_login_id).first()
     if db_user:
         raise HTTPException(status_code=400, detail="아이디가 이미 존재합니다.")
-
-    db_email = db.query(User).filter(User.email == user.email).first()
-    if db_email:
-        raise HTTPException(status_code=400, detail="이메일이 이미 존재합니다.")
 
     hashed_password = hash_password(user.user_login_password)
     
     new_user = User(
         user_login_id=user.user_login_id,
         user_login_password=hashed_password,
-        email=user.email,
-        phone=user.phone
+        name=user.name  # name 필드 추가
     )
     db.add(new_user)
     db.commit()
