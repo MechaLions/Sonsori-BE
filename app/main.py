@@ -49,7 +49,7 @@ app.add_middleware(
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"message": "입력값이 유효하지 않습니다.", "details": exc.errors()},
+        content={"message": "필수 필드가 누락되었습니다.", "details": exc.errors()},
     )
 
 # 패스워드 해싱 함수
@@ -60,7 +60,7 @@ def hash_password(password: str):
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-# 아이디 중복 확인 API (CONFLICT, 409 반환)
+# 아이디 중복 확인 API (CONFLICT, 409 반환, 422 커스터마이징 추가)
 @app.get("/checkIdDuplicate/{user_login_id}", 
          summary="아이디 중복 확인", 
          tags=["유저 API"],
@@ -80,6 +80,14 @@ def verify_password(plain_password, hashed_password):
                          "example": {"message": "아이디가 이미 존재합니다."}
                      }
                  }
+             },
+             422: {
+                 "description": "VALIDATION ERROR",
+                 "content": {
+                     "application/json": {
+                         "example": {"message": "필수 필드가 누락되었습니다."}
+                     }
+                 }
              }
          })
 def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
@@ -88,7 +96,7 @@ def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail={"message": "아이디가 이미 존재합니다."})
     return {"message": "사용 가능한 아이디입니다."}
 
-# 회원가입 엔드포인트 (CONFLICT, 409 반환)
+# 회원가입 엔드포인트 (CONFLICT, 409 반환, 422 설명 변경)
 @app.post("/register", 
           response_model=UserResponse, 
           summary="회원가입", 
@@ -111,10 +119,10 @@ def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
                   }
               },
               422: {
-                  "description": "VALIDATION ERROR",  # 상태 설명을 대문자로 변경
+                  "description": "VALIDATION ERROR",
                   "content": {
                       "application/json": {
-                          "example": {"message": "입력값이 유효하지 않습니다."}
+                          "example": {"message": "필수 필드가 누락되었습니다."}
                       }
                   }
               }
@@ -136,7 +144,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return new_user
 
-# 로그인 엔드포인트 (NOT FOUND, 404 반환)
+# 로그인 엔드포인트 (NOT FOUND, 404 반환, 422 설명 변경)
 @app.post("/login", 
           response_model=UserResponse, 
           summary="로그인", 
@@ -160,10 +168,10 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
                   }
               },
               422: {
-                  "description": "VALIDATION ERROR",  # 상태 설명을 대문자로 변경
+                  "description": "VALIDATION ERROR",
                   "content": {
                       "application/json": {
-                          "example": {"message": "입력값이 유효하지 않습니다."}
+                          "example": {"message": "필수 필드가 누락되었습니다."}
                       }
                   }
               }
@@ -182,4 +190,3 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", port=8000, reload=True)
-
