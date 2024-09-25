@@ -71,11 +71,15 @@ class VoiceQuizResponse(BaseModel):
 class WordCreate(BaseModel):
     category_id: int
     word_text: str
+    sign_url: str  # 추가
+    answer_voice: str  # 추가
 
 class WordResponse(BaseModel):
     word_id: int
     category_id: int
     word_text: str
+    sign_url: str  # 추가
+    answer_voice: str  # 추가
 
     class Config:
         orm_mode = True

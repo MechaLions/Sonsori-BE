@@ -65,5 +65,7 @@ class Word(Base):
     word_id = Column(Integer, primary_key=True, index=True)
     category_id = Column(Integer, ForeignKey("categories.category_id"), nullable=False)
     word_text = Column(String(255), nullable=False)
+    sign_url = Column(String(255), nullable=True)  # 추가
+    answer_voice = Column(String(255), nullable=True)  # 추가
     
     category = relationship("Category")

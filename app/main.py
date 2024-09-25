@@ -10,6 +10,7 @@ from .database import Base
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_socketio import SocketManager
 import mediapipe as mp
+import random
 
 
 # 비밀번호 해싱을 위한 설정
@@ -26,6 +27,13 @@ tags_metadata = [
     {
         "name": "수어 API",
         "description": "수어 관련 API",
+    },
+    {
+        "name": "음성 API",
+        "description": "수어 관련 API",
+    },
+    {
+        "name": "dev API",
     }
 ]
 
@@ -102,10 +110,17 @@ model.load_weights("‪C:/Users/user/python/Sign-Language-Translator/actionxhand
 #data = pd.read_excel("/home/ubuntu/model/sentence_data.xlsx", engine='openpyxl')
 rlf = joblib.load("C:/Users/user/python/Sign-Language-Translator/sentence_model.pkl")
 data = pd.read_excel("C:/Users/user/python/Sign-Language-Translator/sentence_data.xlsx", engine='openpyxl')
+
 data_x = data.drop(['sentence'], axis=1)
 data_y = data['sentence']
 le = LabelEncoder()
 le.fit(data['sentence'])
+
+# 소켓 연결 확인 이벤트
+@sio.on('connect')
+async def connect(sid, environ):
+    print(f"Client {sid} connected")
+    await sio.emit('connection_response', {'message': 'Socket connected!'})
 
 # 수어 번역 WebSocket 핸들러
 @sio.on('image')
@@ -149,7 +164,100 @@ async def image(sid, data_image):
             else:
                 await sio.emit('response_back', sentence[-1])
 
+#수어 번역 텍스트와 정답 텍스트 비교 및 정확도 계산 API
+@app.post("/calculate_accuracy/")
+async def calculate_accuracy(user_id: int, correct_text: str, translated_text: str, db: Session = Depends(get_db)):
+    correct_words = correct_text.split(" ")
+    translated_words = translated_text.split(" ")
+    
+    correct_count = sum(1 for word in translated_words if word in correct_words)
+    accuracy = correct_count / len(correct_words) if correct_words else 0
 
+    # 사용자 MyPage 정보 업데이트
+    my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
+    if my_page:
+        my_page.shadowing_accuracy_sum += accuracy
+        my_page.shadowing_solved_number += 1
+        db.commit()
+    else:
+        raise HTTPException(status_code=404, detail="MyPage 정보를 찾을 수 없습니다.")
+
+    return {
+        "correct_text": correct_text,
+        "translated_text": translated_text,
+        "accuracy": accuracy
+    }
+
+#카테고리 ID를 통한 평균 정확도 저장 API
+@app.post("/save_shadowing_accuracy/")
+async def save_shadowing_accuracy(user_id: int, category_id: int, db: Session = Depends(get_db)):
+    my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
+    if my_page:
+        if my_page.shadowing_solved_number > 0:
+            my_page.shadowing_accuracy_avg = my_page.shadowing_accuracy_sum / my_page.shadowing_solved_number
+            my_page.shadowing_category_id = category_id
+            db.commit()
+        else:
+            raise HTTPException(status_code=400, detail="Solved number is zero, cannot calculate average.")
+    else:
+        raise HTTPException(status_code=404, detail="MyPage 정보를 찾을 수 없습니다.")
+
+    return {"message": "Shadowing accuracy updated successfully"}
+
+#특정 카테고리 ID로 10개의 랜덤 단어 반환 API
+@app.get("/category/{category_id}/words", 
+         summary="특정 카테고리에서 10개 랜덤 단어 반환", 
+         tags=["수어 API"],
+         responses={
+             200: {
+                 "description": "OK",
+                 "content": {
+                     "application/json": {
+                         "example": [
+                             {"word_id": 1, "word_text": "사과", "sign_url": "http://example.com/sign1"},
+                             {"word_id": 2, "word_text": "바나나", "sign_url": "http://example.com/sign2"}
+                         ]
+                     }
+                 }
+             },
+             404: {
+                 "description": "NOT FOUND",
+                 "content": {
+                     "application/json": {
+                         "example": {"message": "해당 카테고리에서 단어를 찾을 수 없습니다."}
+                     }
+                 }
+             }
+         })
+async def get_random_words_from_category(category_id: int, db: Session = Depends(get_db)):
+    words = db.query(Word).filter(Word.category_id == category_id).all()
+    if not words:
+        raise HTTPException(status_code=404, detail={"message": "해당 카테고리에서 단어를 찾을 수 없습니다."})
+    
+    random_words = random.sample(words, min(len(words), 10))
+    return [{"word_id": word.word_id, "word_text": word.word_text, "sign_url": word.sign_url} for word in random_words]
+
+#카테고리와 상관없이 5개의 랜덤 단어 반환 API
+@app.get("/words/random", 
+         summary="카테고리와 상관없이 5개 랜덤 단어 반환", 
+         tags=["수어 API"],
+         responses={
+             200: {
+                 "description": "OK",
+                 "content": {
+                     "application/json": {
+                         "example": [
+                             {"word_id": 1, "word_text": "사과", "sign_url": "http://example.com/sign1"},
+                             {"word_id": 2, "word_text": "바나나", "sign_url": "http://example.com/sign2"}
+                         ]
+                     }
+                 }
+             }
+         })
+async def get_random_words(db: Session = Depends(get_db)):
+    words = db.query(Word).all()
+    random_words = random.sample(words, min(len(words), 5))
+    return [{"word_id": word.word_id, "word_text": word.word_text, "sign_url": word.sign_url} for word in random_words]
 
 
 """
@@ -289,6 +397,39 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail={"message": "비밀번호가 일치하지 않습니다."})
 
     return db_user
+
+#특정 유저의 MyPage 조회 API
+@app.get("/mypage/{user_id}", 
+         summary="특정 유저의 MyPage 조회", 
+         tags=["유저 API"],
+         responses={
+             200: {
+                 "description": "OK",
+                 "content": {
+                     "application/json": {
+                         "example": {
+                             "my_page_id": 1,
+                             "quiz_correct_number": 5,
+                             "shadowing_accuracy_avg": 80,
+                             "voice_accuracy_avg": 90
+                         }
+                     }
+                 }
+             },
+             404: {
+                 "description": "NOT FOUND",
+                 "content": {
+                     "application/json": {
+                         "example": {"message": "MyPage 정보를 찾을 수 없습니다."}
+                     }
+                 }
+             }
+         })
+async def get_mypage(user_id: int, db: Session = Depends(get_db)):
+    my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
+    if not my_page:
+        raise HTTPException(status_code=404, detail={"message": "MyPage 정보를 찾을 수 없습니다."})
+    return my_page
 
 if __name__ == "__main__":
     import uvicorn
