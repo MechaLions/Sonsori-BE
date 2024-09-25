@@ -6,6 +6,7 @@ from fastapi_socketio import SocketManager
 from passlib.context import CryptContext
 import mediapipe as mp
 import random
+import numpy as np
 from sqlalchemy.orm import Session
 from .database import engine, get_db, Base
 from .models import User, MyPage, Word, Category  # 데이터베이스 모델들
@@ -51,7 +52,10 @@ app = FastAPI(
 # CORS 설정 (필요시)
 origins = [
     "http://localhost",
+    "http://127.0.0.1",
     "http://localhost:8000",
+    "http://0.0.0.0:8000",
+    "http://127.0.0.1:8000",
     "http://localhost:5173",
 ]
 app.add_middleware(
@@ -107,7 +111,8 @@ model.add(Dense(actions.shape[0], activation='softmax'))
 model.compile(optimizer='Adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
 #model.load_weights("/home/ubuntu/model/actionxhand_data0524_0513.h5")  # 모델 파일 경로
 #model.load_weights("‪C:/Users/user/python/Sign-Language-Translator/actionxhand_data0524_0513.h5")  # 모델 파일 경로
-model.load_weights("‪/app/models/actionxhand_data0524_0513.h5")  # 모델 파일 경로
+model.load_weights("/app/models/actionxhand_data0524_0513.h5")
+
 
 # LabelEncoder 및 기타 모델 로드
 #rlf = joblib.load("/home/ubuntu/model/sentence_model.pkl")
@@ -115,7 +120,7 @@ model.load_weights("‪/app/models/actionxhand_data0524_0513.h5")  # 모델 파�
 #rlf = joblib.load("C:/Users/user/python/Sign-Language-Translator/sentence_model.pkl")
 #data = pd.read_excel("C:/Users/user/python/Sign-Language-Translator/sentence_data.xlsx", engine='openpyxl') #모델 파일 경료
 rlf = joblib.load("/app/models/sentence_model.pkl")
-data = pd.read_excel("/app/models/sentence_data.xlsx", engine='openpyxl') #모델 파일 경료
+data = pd.read_excel("/app/models/sentence_data.xlsx", engine='openpyxl')
 
 data_x = data.drop(['sentence'], axis=1)
 data_y = data['sentence']

@@ -8,8 +8,13 @@ WORKDIR /app
 # 시스템 패키지 업데이트 및 필수 패키지 설치
 RUN apt-get update && apt-get install -y \
     build-essential \
-    libmysqlclient-dev \
+    libmariadb-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
+
+# setuptools와 wheel 미리 설치
+RUN pip install --no-cache-dir --upgrade setuptools==58.0.4 wheel
 
 # 의존성 설치
 COPY ./requirements.txt /app/requirements.txt
