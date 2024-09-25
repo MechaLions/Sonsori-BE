@@ -5,6 +5,12 @@ FROM python:3.10-slim
 # 작업 디렉토리 생성
 WORKDIR /app
 
+# 시스템 패키지 업데이트 및 필수 패키지 설치
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libmysqlclient-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # 의존성 설치
 COPY ./requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
@@ -12,7 +18,7 @@ RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
 # 필요한 파일들을 복사
 COPY ./app /app/app
 COPY ./mecalions /app/mecalions
-
+COPY ./models /app/models
 
 # .env 파일 복사
 COPY .env /app/.env

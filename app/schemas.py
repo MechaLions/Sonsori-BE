@@ -13,6 +13,7 @@ class UserResponse(BaseModel):
     user_id: int
     user_login_id: str
     name: str
+    mypage_id: int  # 추가
 
     class Config:
         orm_mode = True

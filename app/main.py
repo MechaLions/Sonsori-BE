@@ -1,17 +1,20 @@
 from fastapi import FastAPI, Request, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from sqlalchemy.orm import Session
-from passlib.context import CryptContext
-from .database import engine, get_db
-from .models import User
-from .schemas import UserCreate, UserLogin, UserResponse
-from .database import Base
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_socketio import SocketManager
+from passlib.context import CryptContext
 import mediapipe as mp
 import random
-
+from sqlalchemy.orm import Session
+from .database import engine, get_db, Base
+from .models import User, MyPage, Word, Category  # 데이터베이스 모델들
+from .schemas import UserCreate, UserLogin, UserResponse, WordCreate, WordResponse, CategoryCreate, CategoryResponse  # 스키마
+from tensorflow.keras.models import Sequential  # LSTM 모델
+from tensorflow.keras.layers import LSTM, Dense  # LSTM 레이어
+from sklearn.preprocessing import LabelEncoder  # 정답 텍스트 인코딩
+import joblib  # 모델 로딩을 위한 joblib
+import pandas as pd  # 엑셀 파일 로드용
 
 # 비밀번호 해싱을 위한 설정
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -30,7 +33,7 @@ tags_metadata = [
     },
     {
         "name": "음성 API",
-        "description": "수어 관련 API",
+        "description": "발음 교정 관련 API",
     },
     {
         "name": "dev API",
@@ -103,13 +106,16 @@ model.add(Dense(actions.shape[0], activation='softmax'))
 
 model.compile(optimizer='Adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
 #model.load_weights("/home/ubuntu/model/actionxhand_data0524_0513.h5")  # 모델 파일 경로
-model.load_weights("‪C:/Users/user/python/Sign-Language-Translator/actionxhand_data0524_0513.h5")  # 모델 파일 경로
+#model.load_weights("‪C:/Users/user/python/Sign-Language-Translator/actionxhand_data0524_0513.h5")  # 모델 파일 경로
+model.load_weights("‪/app/models/actionxhand_data0524_0513.h5")  # 모델 파일 경로
 
 # LabelEncoder 및 기타 모델 로드
 #rlf = joblib.load("/home/ubuntu/model/sentence_model.pkl")
-#data = pd.read_excel("/home/ubuntu/model/sentence_data.xlsx", engine='openpyxl')
-rlf = joblib.load("C:/Users/user/python/Sign-Language-Translator/sentence_model.pkl")
-data = pd.read_excel("C:/Users/user/python/Sign-Language-Translator/sentence_data.xlsx", engine='openpyxl')
+#data = pd.read_excel("/home/ubuntu/model/sentence_data.xlsx", engine='openpyxl') #모델 파일 경료
+#rlf = joblib.load("C:/Users/user/python/Sign-Language-Translator/sentence_model.pkl")
+#data = pd.read_excel("C:/Users/user/python/Sign-Language-Translator/sentence_data.xlsx", engine='openpyxl') #모델 파일 경료
+rlf = joblib.load("/app/models/sentence_model.pkl")
+data = pd.read_excel("/app/models/sentence_data.xlsx", engine='openpyxl') #모델 파일 경료
 
 data_x = data.drop(['sentence'], axis=1)
 data_y = data['sentence']
@@ -165,32 +171,100 @@ async def image(sid, data_image):
                 await sio.emit('response_back', sentence[-1])
 
 #수어 번역 텍스트와 정답 텍스트 비교 및 정확도 계산 API
-@app.post("/calculate_accuracy/")
-async def calculate_accuracy(user_id: int, correct_text: str, translated_text: str, db: Session = Depends(get_db)):
+@app.post("/calculateAccuracy/",
+          summary="수어 번역 텍스트와 정답 텍스트 비교 및 정확도 계산",
+          tags=["수어 API"],
+          responses={
+              200: {
+                  "description": "OK",
+                  "content": {
+                      "application/json": {
+                          "example": {
+                              "word_id": 1,
+                              "translated_text": "안녕하세요",
+                              "accuracy": 100
+                          }
+                      }
+                  }
+              },
+              404: {
+                  "description": "NOT FOUND",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "Word 정보를 찾을 수 없습니다."}
+                      }
+                  }
+              }
+          })
+async def calculate_accuracy(user_id: int, word_id: int, translated_text: str, db: Session = Depends(get_db)):
+    word = db.query(Word).filter(Word.word_id == word_id).first()
+    if not word:
+        raise HTTPException(status_code=404, detail={"message": "Word 정보를 찾을 수 없습니다."})
+
+    correct_text = word.word_text  # DB에서 정답 텍스트 가져오기
     correct_words = correct_text.split(" ")
     translated_words = translated_text.split(" ")
     
     correct_count = sum(1 for word in translated_words if word in correct_words)
-    accuracy = correct_count / len(correct_words) if correct_words else 0
+    accuracy = (correct_count / len(correct_words)) * 100 if correct_words else 0  # %로 변환
 
     # 사용자 MyPage 정보 업데이트
     my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
     if my_page:
         my_page.shadowing_accuracy_sum += accuracy
         my_page.shadowing_solved_number += 1
+        my_page.shadowing_solved_number = 0
+        my_page.shadowing_accuracy_sum = 0.0
         db.commit()
     else:
-        raise HTTPException(status_code=404, detail="MyPage 정보를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail={"message": "MyPage 정보를 찾을 수 없습니다."})
 
     return {
-        "correct_text": correct_text,
+        "word_id": word_id,
         "translated_text": translated_text,
-        "accuracy": accuracy
+        "accuracy": int(accuracy)  # 소수점 제거하여 정수로 반환
     }
 
+
 #카테고리 ID를 통한 평균 정확도 저장 API
-@app.post("/save_shadowing_accuracy/")
-async def save_shadowing_accuracy(user_id: int, category_id: int, db: Session = Depends(get_db)):
+@app.post("/saveShadowingAccuracy/",
+          summary="카테고리 ID를 통한 평균 정확도 저장",
+          tags=["수어 API"],
+          responses={
+              200: {
+                  "description": "OK",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "평균 정확도가 성공적으로 업데이트되었습니다."}
+                      }
+                  }
+              },
+              404: {
+                  "description": "NOT FOUND",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "MyPage 정보를 찾을 수 없습니다."}
+                      }
+                  }
+              },
+              400: {
+                  "description": "BAD REQUEST",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "풀이한 문제가 없어 평균을 계산할 수 없습니다."}
+                      }
+                  }
+              },
+              422: {
+                  "description": "VALIDATION ERROR",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "필수 필드가 누락되었습니다."}
+                      }
+                  }
+              }
+          })
+async def saveShadowingAccuracy(user_id: int, category_id: int, db: Session = Depends(get_db)):
     my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
     if my_page:
         if my_page.shadowing_solved_number > 0:
@@ -198,11 +272,12 @@ async def save_shadowing_accuracy(user_id: int, category_id: int, db: Session = 
             my_page.shadowing_category_id = category_id
             db.commit()
         else:
-            raise HTTPException(status_code=400, detail="Solved number is zero, cannot calculate average.")
+            raise HTTPException(status_code=400, detail={"message": "풀이한 문제가 없어 평균을 계산할 수 없습니다."})
     else:
-        raise HTTPException(status_code=404, detail="MyPage 정보를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail={"message": "MyPage 정보를 찾을 수 없습니다."})
 
-    return {"message": "Shadowing accuracy updated successfully"}
+    return {"message": "평균 정확도가 성공적으로 업데이트되었습니다."}
+    
 
 #특정 카테고리 ID로 10개의 랜덤 단어 반환 API
 @app.get("/category/{category_id}/words", 
@@ -258,6 +333,9 @@ async def get_random_words(db: Session = Depends(get_db)):
     words = db.query(Word).all()
     random_words = random.sample(words, min(len(words), 5))
     return [{"word_id": word.word_id, "word_text": word.word_text, "sign_url": word.sign_url} for word in random_words]
+
+
+
 
 
 """
@@ -349,7 +427,14 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return new_user
+
+    # MyPage 생성
+    new_mypage = MyPage(user_id=new_user.user_id)
+    db.add(new_mypage)
+    db.commit()
+    db.refresh(new_mypage)
+
+    return new_user  # UserResponse 모델이 mypage_id를 포함하도록 설정
 
 # 로그인 엔드포인트 (user 객체 반환 및 example value 통일)
 @app.post("/login", 
@@ -430,6 +515,74 @@ async def get_mypage(user_id: int, db: Session = Depends(get_db)):
     if not my_page:
         raise HTTPException(status_code=404, detail={"message": "MyPage 정보를 찾을 수 없습니다."})
     return my_page
+
+"""
+dev API 파트
+"""
+@app.post("/words/", 
+          response_model=WordResponse, 
+          summary="단어 추가", 
+          tags=["dev API"], 
+          responses={
+              200: {
+                  "description": "OK",
+                  "content": {
+                      "application/json": {
+                          "example": {
+                              "word_id": 1,
+                              "category_id": 1,
+                              "word_text": "사과",
+                              "sign_url": "http://example.com/sign1",
+                              "answer_voice": "사과"
+                          }
+                      }
+                  }
+              },
+              422: {
+                  "description": "VALIDATION ERROR",
+                  "content": {
+                      "example": {"message": "필수 필드가 누락되었습니다."}
+                  }
+              }
+          })
+def create_word(word: WordCreate, db: Session = Depends(get_db)):
+    new_word = Word(**word.dict())
+    db.add(new_word)
+    db.commit()
+    db.refresh(new_word)
+    return new_word
+
+@app.post("/categories/", 
+          response_model=CategoryResponse, 
+          summary="카테고리 추가", 
+          tags=["dev API"], 
+          responses={
+              201: {
+                  "description": "OK",
+                  "content": {
+                      "application/json": {
+                          "example": {
+                              "category_id": 1,
+                              "category_name": "과일",
+                              "description": "과일 관련 단어 모음",
+                              "category_image_url": "http://example.com/image1"
+                          }
+                      }
+                  }
+              },
+              422: {
+                  "description": "VALIDATION ERROR",
+                  "content": {
+                      "example": {"message": "필수 필드가 누락되었습니다."}
+                  }
+              }
+          })
+def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
+    new_category = Category(**category.dict())
+    db.add(new_category)
+    db.commit()
+    db.refresh(new_category)
+    return new_category
 
 if __name__ == "__main__":
     import uvicorn

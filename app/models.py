@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String
 from .database import Base
+from sqlalchemy.orm import relationship
 
 class User(Base):
     __tablename__ = "users"
@@ -8,6 +9,11 @@ class User(Base):
     user_login_id = Column(String(255), unique=True, index=True, nullable=False)
     user_login_password = Column(String(255), nullable=False)
     name = Column(String(255), nullable=False)
+    my_page = relationship("MyPage", back_populates="user", uselist=False)
+
+    @property
+    def mypage_id(self):
+        return self.my_page.my_page_id if self.my_page else None
 
 class MyPage(Base):
     __tablename__ = "my_page"
