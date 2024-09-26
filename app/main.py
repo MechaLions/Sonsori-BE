@@ -176,7 +176,7 @@ async def image(sid, data_image):
                 await sio.emit('response_back', sentence[-1])
 
 #수어 번역 텍스트와 정답 텍스트 비교 및 정확도 계산 API
-@app.post("/calculateAccuracy/",
+@app.post("/shadowing/calculateAccuracy",
           summary="수어 번역 텍스트와 정답 텍스트 비교 및 정확도 계산",
           tags=["수어 API"],
           responses={
@@ -218,21 +218,20 @@ async def calculate_accuracy(user_id: int, word_id: int, translated_text: str, d
     if my_page:
         my_page.shadowing_accuracy_sum += accuracy
         my_page.shadowing_solved_number += 1
-        my_page.shadowing_solved_number = 0
-        my_page.shadowing_accuracy_sum = 0.0
         db.commit()
     else:
         raise HTTPException(status_code=404, detail={"message": "MyPage 정보를 찾을 수 없습니다."})
 
     return {
         "word_id": word_id,
+        "correct_text": correct_text,
         "translated_text": translated_text,
         "accuracy": int(accuracy)  # 소수점 제거하여 정수로 반환
     }
 
 
 #카테고리 ID를 통한 평균 정확도 저장 API
-@app.post("/saveShadowingAccuracy/",
+@app.post("/shadowing/saveShadowingAccuracy",
           summary="카테고리 ID를 통한 평균 정확도 저장",
           tags=["수어 API"],
           responses={
@@ -275,6 +274,8 @@ async def saveShadowingAccuracy(user_id: int, category_id: int, db: Session = De
         if my_page.shadowing_solved_number > 0:
             my_page.shadowing_accuracy_avg = my_page.shadowing_accuracy_sum / my_page.shadowing_solved_number
             my_page.shadowing_category_id = category_id
+            my_page.shadowing_solved_number = 0
+            my_page.shadowing_accuracy_sum = 0.0
             db.commit()
         else:
             raise HTTPException(status_code=400, detail={"message": "풀이한 문제가 없어 평균을 계산할 수 없습니다."})
@@ -285,7 +286,7 @@ async def saveShadowingAccuracy(user_id: int, category_id: int, db: Session = De
     
 
 #특정 카테고리 ID로 10개의 랜덤 단어 반환 API
-@app.get("/category/{category_id}/words", 
+@app.get("/shadowing/{category_id}/words", 
          summary="특정 카테고리에서 10개 랜덤 단어 반환", 
          tags=["수어 API"],
          responses={
@@ -293,10 +294,10 @@ async def saveShadowingAccuracy(user_id: int, category_id: int, db: Session = De
                  "description": "OK",
                  "content": {
                      "application/json": {
-                         "example": [
-                             {"word_id": 1, "word_text": "사과", "sign_url": "http://example.com/sign1"},
-                             {"word_id": 2, "word_text": "바나나", "sign_url": "http://example.com/sign2"}
-                         ]
+                         "words": [
+                                 {"word_id": 1, "word_text": "사과", "sign_url": "http://example.com/sign1"},
+                                 {"word_id": 2, "word_text": "바나나", "sign_url": "http://example.com/sign2"}
+                        ]
                      }
                  }
              },
@@ -315,10 +316,11 @@ async def get_random_words_from_category(category_id: int, db: Session = Depends
         raise HTTPException(status_code=404, detail={"message": "해당 카테고리에서 단어를 찾을 수 없습니다."})
     
     random_words = random.sample(words, min(len(words), 10))
+    
     return [{"word_id": word.word_id, "word_text": word.word_text, "sign_url": word.sign_url} for word in random_words]
 
 #카테고리와 상관없이 5개의 랜덤 단어 반환 API
-@app.get("/words/random", 
+@app.get("/quiz/words/random", 
          summary="카테고리와 상관없이 5개 랜덤 단어 반환", 
          tags=["수어 API"],
          responses={
@@ -337,7 +339,12 @@ async def get_random_words_from_category(category_id: int, db: Session = Depends
 async def get_random_words(db: Session = Depends(get_db)):
     words = db.query(Word).all()
     random_words = random.sample(words, min(len(words), 5))
-    return [{"word_id": word.word_id, "word_text": word.word_text, "sign_url": word.sign_url} for word in random_words]
+    return {
+        "words": [
+            {"word_id": word.word_id, "word_text": word.word_text, "sign_url": word.sign_url} 
+            for word in random_words
+        ]
+    }
 
 
 
@@ -498,10 +505,12 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
                  "content": {
                      "application/json": {
                          "example": {
-                             "my_page_id": 1,
+                             "name": "홍길동",
                              "quiz_correct_number": 5,
-                             "shadowing_accuracy_avg": 80,
-                             "voice_accuracy_avg": 90
+                             "shadowing_accuracy_avg": 80.5,
+                             "shadowing_category_name": "과일",
+                             "voice_accuracy_avg": 90.2,
+                             "voice_category_name": "음식"
                          }
                      }
                  }
@@ -516,10 +525,36 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
              }
          })
 async def get_mypage(user_id: int, db: Session = Depends(get_db)):
+    # 유저 조회
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail={"message": "User 정보를 찾을 수 없습니다."})
+
+    # MyPage 조회
     my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
     if not my_page:
         raise HTTPException(status_code=404, detail={"message": "MyPage 정보를 찾을 수 없습니다."})
-    return my_page
+
+    # Shadowing, Voice 카테고리 이름 조회
+    shadowing_category_name = None
+    voice_category_name = None
+    if my_page.shadowing_category_id:
+        shadowing_category = db.query(Category).filter(Category.category_id == my_page.shadowing_category_id).first()
+        shadowing_category_name = shadowing_category.category_name if shadowing_category else None
+
+    if my_page.voice_category_id:
+        voice_category = db.query(Category).filter(Category.category_id == my_page.voice_category_id).first()
+        voice_category_name = voice_category.category_name if voice_category else None
+
+    return {
+        "name": user.name,
+        "quiz_correct_number": my_page.quiz_correct_number,
+        "shadowing_accuracy_avg": my_page.shadowing_accuracy_avg,
+        "shadowing_category_name": shadowing_category_name,
+        "voice_accuracy_avg": my_page.voice_accuracy_avg,
+        "voice_category_name": voice_category_name
+    }
+
 
 """
 dev API 파트
@@ -591,5 +626,5 @@ def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", port=8000, reload=True)
+    uvicorn.run("app.main:app", port=8000, reload=False)
 

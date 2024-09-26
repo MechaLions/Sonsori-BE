@@ -73,5 +73,6 @@ class Word(Base):
     word_text = Column(String(255), nullable=False)
     sign_url = Column(String(255), nullable=True)  # 추가
     answer_voice = Column(String(255), nullable=True)  # 추가
+    correct_pronunciation = Column(String(255), nullable=True) # 추가
     
     category = relationship("Category")

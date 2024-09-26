@@ -23,6 +23,12 @@ class MyPageResponse(BaseModel):
     quiz_correct_number: int
     shadowing_accuracy_avg: float
     voice_accuracy_avg: float
+    shadowing_category_id: int  # 추가
+    voice_category_id: int  # 추가
+    shadowing_accuracy_sum: float  # 추가
+    shadowing_solved_number: int  # 추가
+    voice_accuracy_sum: float  # 추가
+    voice_solved_number: int  # 추가
 
     class Config:
         orm_mode = True
@@ -81,6 +87,7 @@ class WordResponse(BaseModel):
     word_text: str
     sign_url: str  # 추가
     answer_voice: str  # 추가
+    correct_pronunciation: Optional[str] = None  # 추가
 
     class Config:
         orm_mode = True
