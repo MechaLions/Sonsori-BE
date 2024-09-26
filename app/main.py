@@ -37,6 +37,14 @@ tags_metadata = [
         "description": "발음 교정 관련 API",
     },
     {
+        "name": "퀴즈 API",
+        "description": "퀴즈 관련 API",
+    },
+    {
+        "name": "카테고리 API",
+        "description": "카테고리 전체 목록 조회 API",
+    },
+    {
         "name": "dev API",
     }
 ]
@@ -346,7 +354,125 @@ async def get_random_words(db: Session = Depends(get_db)):
         ]
     }
 
+"""
+카테고리 API
+"""
+@app.get("/categories", 
+         summary="카테고리 전체 목록 조회", 
+         tags=["유저 API"],
+         responses={
+             200: {
+                 "description": "OK",
+                 "content": {
+                     "application/json": {
+                         "example": {
+                             "categories": [
+                                 {"category_id": 1, "category_name": "과일", "description": "과일 관련 단어 모음", "category_image_url": "http://example.com/image1"},
+                                 {"category_id": 2, "category_name": "동물", "description": "동물 관련 단어 모음", "category_image_url": "http://example.com/image2"}
+                             ]
+                         }
+                     }
+                 }
+             },
+             404: {
+                 "description": "NOT FOUND",
+                 "content": {
+                     "application/json": {
+                         "example": {"message": "카테고리가 없습니다."}
+                     }
+                 }
+             }
+         })
+async def get_all_categories(db: Session = Depends(get_db)):
+    categories = db.query(Category).all()
+    if not categories:
 
+        
+"""
+퀴즈 API 파트
+"""
+@app.get("/quiz", summary="퀴즈 10개 묶음 받는 API", tags=["퀴즈 API"])
+async def get_quiz(db: Session = Depends(get_db)):
+    # 수어 문제 5개 선택 (sign_url이 존재하는 단어)
+    sign_language_words = db.query(Word).filter(Word.sign_url.isnot(None)).all()
+
+    if len(sign_language_words) < 5:
+        raise HTTPException(status_code=404, detail="수어 문제를 위한 단어가 충분하지 않습니다.")
+
+    sign_language_questions = random.sample(sign_language_words, 5)
+
+    # 객관식 문제 5개 선택
+    all_words = db.query(Word).all()
+    if len(all_words) < 8:  # 객관식 문제 하나당 4개의 보기가 필요하므로 최소 8개 이상의 단어가 필요
+        raise HTTPException(status_code=404, detail="객관식 문제를 위한 단어가 충분하지 않습니다.")
+
+    multiple_choice_questions = []
+    for _ in range(5):
+        correct_word = random.choice(all_words)
+        all_words_except_correct = [word for word in all_words if word.word_id != correct_word.word_id]
+        options = random.sample(all_words_except_correct, 3)  # 오답 3개 선택
+        options.append(correct_word)  # 정답을 보기 중 하나로 추가
+        random.shuffle(options)  # 보기 순서 섞기
+        multiple_choice_questions.append({
+            "type": "multiple_choice",
+            "word_id": correct_word.word_id,
+            "correct_text": correct_word.word_text,
+            "options": [option.word_text for option in options]
+        })
+
+    # 최종 퀴즈 반환 (5개 수어 문제 + 5개 객관식 문제)
+    quiz = [
+        {
+            "type": "sign_language",
+            "word_id": word.word_id,
+            "correct_text": word.word_text,
+            "sign_url": word.sign_url
+        } for word in sign_language_questions
+    ] + multiple_choice_questions
+
+    return {"quiz": quiz}
+
+
+@app.post("/quiz/{user_id}/record", 
+          summary="퀴즈 점수 기록", 
+          tags=["퀴즈 API"],
+          responses={
+              200: {
+                  "description": "OK",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "퀴즈 점수가 기록되었습니다."}
+                      }
+                  }
+              },
+              404: {
+                  "description": "NOT FOUND",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "MyPage 정보를 찾을 수 없습니다."}
+                      }
+                  }
+              },
+              422: {
+                  "description": "VALIDATION ERROR",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "필수 필드가 누락되었습니다."}
+                      }
+                  }
+              }
+          })
+async def record_quiz_score(user_id: int, quiz_correct_number: int, db: Session = Depends(get_db)):
+    # MyPage 조회
+    my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
+    if not my_page:
+        raise HTTPException(status_code=404, detail={"message": "MyPage 정보를 찾을 수 없습니다."})
+
+    # 퀴즈 맞은 문제 수 업데이트
+    my_page.quiz_correct_number = quiz_correct_number
+    db.commit()
+
+    return {"message": "퀴즈 점수가 기록되었습니다."}
 
 
 
@@ -592,7 +718,7 @@ def create_word(word: WordCreate, db: Session = Depends(get_db)):
     db.refresh(new_word)
     return new_word
 
-@app.post("/categories/", 
+@app.post("/categories", 
           response_model=CategoryResponse, 
           summary="카테고리 추가", 
           tags=["dev API"], 
