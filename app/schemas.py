@@ -18,6 +18,9 @@ class UserResponse(BaseModel):
     class Config:
         orm_mode = True
 
+class CheckIDRequest(BaseModel):
+    user_login_id: str
+
 class MyPageResponse(BaseModel):
     my_page_id: int
     quiz_correct_number: int

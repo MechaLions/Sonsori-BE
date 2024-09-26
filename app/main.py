@@ -10,7 +10,7 @@ import numpy as np
 from sqlalchemy.orm import Session
 from .database import engine, get_db, Base
 from .models import User, MyPage, Word, Category  # 데이터베이스 모델들
-from .schemas import UserCreate, UserLogin, UserResponse, WordCreate, WordResponse, CategoryCreate, CategoryResponse  # 스키마
+from .schemas import UserCreate, UserLogin, UserResponse, WordCreate, WordResponse, CategoryCreate, CategoryResponse, CheckIDRequest  # 스키마
 from tensorflow.keras.models import Sequential  # LSTM 모델
 from tensorflow.keras.layers import LSTM, Dense  # LSTM 레이어
 from sklearn.preprocessing import LabelEncoder  # 정답 텍스트 인코딩
@@ -354,7 +354,7 @@ async def get_random_words(db: Session = Depends(get_db)):
 유저 API 파트
 """
 # 아이디 중복 확인 API (CONFLICT, 409 반환, 422 커스터마이징 추가)
-@app.get("/checkIdDuplicate/{user_login_id}", 
+@app.get("/checkIdDuplicate", 
          summary="아이디 중복 확인", 
          tags=["유저 API"],
          responses={
@@ -383,8 +383,8 @@ async def get_random_words(db: Session = Depends(get_db)):
                  }
              }
          })
-def check_id_duplicate(user_login_id: str, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.user_login_id == user_login_id).first()
+def check_id_duplicate(request: CheckIDRequest, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.user_login_id == request.user_login_id).first()
     if db_user:
         raise HTTPException(status_code=409, detail={"message": "아이디가 이미 존재합니다."})
     return {"message": "사용 가능한 아이디입니다."}
@@ -557,7 +557,7 @@ async def get_mypage(user_id: int, db: Session = Depends(get_db)):
 
 
 """
-dev API 파트
+dev API
 """
 @app.post("/words/", 
           response_model=WordResponse, 
