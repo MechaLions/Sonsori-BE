@@ -328,7 +328,33 @@ async def get_random_voice_words_from_category(category_id: int, db: Session = D
 
 
 # 2. 음성 파일을 받아 음절별 정확도 계산 및 응답 반환 API
-@app.post("/voice/calculateAccuracy/{user_id}/{word_id}", summary="음성 파일을 받아 음절별 정확도 계산")
+@app.post("/voice/calculateAccuracy/{user_id}/{word_id}", 
+          summary="음성 파일을 받아 음절별 정확도 계산",
+          tags=["음성 API"],
+          responses={
+              200: {
+                  "description": "OK",
+                  "content": {
+                      "application/json": {
+                          "example": {
+                              "word_id": 1,
+                              "correct_text": "밥 먹었어",
+                              "correct_pronunciation": "밥 머거써",
+                              "voice_recognition_result": "밥머거써",
+                              "accuracy": 100
+                          }
+                      }
+                  }
+              },
+              404: {
+                  "description": "NOT FOUND",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "Word 정보를 찾을 수 없습니다."}
+                      }
+                  }
+              }
+          })
 async def calculate_voice_accuracy(
     user_id: int, 
     word_id: int, 
@@ -381,7 +407,35 @@ async def calculate_voice_accuracy(
 
 
 # 3. 음성 문제 평균 정확도 저장 API
-@app.post("/voice/saveVoiceAccuracy/{user_id}", summary="카테고리 ID를 통한 음성 번역 평균 정확도 저장", tags=["음성 API"])
+@app.post("/voice/saveVoiceAccuracy/{user_id}", 
+          summary="카테고리 ID를 통한 음성 번역 평균 정확도 저장", 
+          tags=["음성 API"],
+          responses={
+              200: {
+                  "description": "OK",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "평균 정확도가 성공적으로 업데이트되었습니다."}
+                      }
+                  }
+              },
+              404: {
+                  "description": "NOT FOUND",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "MyPage 정보를 찾을 수 없습니다."}
+                      }
+                  }
+              },
+              400: {
+                  "description": "BAD REQUEST",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "풀이한 문제가 없어 평균을 계산할 수 없습니다."}
+                      }
+                  }
+              }
+          })
 async def save_voice_accuracy(user_id: int, category_id: int, db: Session = Depends(get_db)):
     """
     카테고리 ID를 받아 해당 유저의 음성 번역 문제 평균 정확도를 계산하고 저장하는 API
