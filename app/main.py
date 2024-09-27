@@ -11,7 +11,7 @@ import numpy as np
 from sqlalchemy.orm import Session
 from .database import engine, get_db, Base
 from .models import User, MyPage, Word, Category  # 데이터베이스 모델들
-from .schemas import UserCreate, UserLogin, UserResponse, WordCreate, WordResponse, CategoryCreate, CategoryResponse, CheckIDRequest, WordUpdate, WordListResponse, CategoryUpdate  # 스키마
+from .schemas import UserCreate, UserLogin, UserResponse, WordCreate, WordResponse, CategoryCreate, CategoryResponse, CheckIDRequest, WordUpdate, WordListResponse, CategoryUpdate, QuizScoreUpdate, TranslatedTextRequest  # 스키마
 from typing import List
 
 
@@ -103,7 +103,7 @@ def verify_password(plain_password, hashed_password):
 수어 인식 API 파트
 """
 #수어 번역 텍스트와 정답 텍스트 비교 및 정확도 계산 API
-@app.post("/shadowing/calculateAccuracy",
+@app.post("/shadowing/calculateAccuracy/{user_id}/{word_id}",
           summary="수어 번역 텍스트와 정답 텍스트 비교 및 정확도 계산",
           tags=["수어 API"],
           responses={
@@ -136,14 +136,14 @@ def verify_password(plain_password, hashed_password):
                   }
               }
           })
-async def calculate_accuracy(user_id: int, word_id: int, translated_text: str, db: Session = Depends(get_db)):
+async def calculate_accuracy(user_id: int, word_id: int, request: TranslatedTextRequest, db: Session = Depends(get_db)):
     word = db.query(Word).filter(Word.word_id == word_id).first()
     if not word:
         raise HTTPException(status_code=404, detail={"message": "Word 정보를 찾을 수 없습니다."})
 
     correct_text = word.word_text  # DB에서 정답 텍스트 가져오기
     correct_words = correct_text.split(" ")
-    translated_words = translated_text.split(" ")
+    translated_words = request.translated_text.split(" ")
     
     correct_count = sum(1 for word in translated_words if word in correct_words)
     accuracy = (correct_count / len(correct_words)) * 100 if correct_words else 0  # %로 변환
@@ -166,7 +166,7 @@ async def calculate_accuracy(user_id: int, word_id: int, translated_text: str, d
 
 
 #카테고리 ID를 통한 평균 정확도 저장 API
-@app.post("/shadowing/saveShadowingAccuracy",
+@app.post("/shadowing/saveShadowingAccuracy/{user_id}/{category_id}",
           summary="카테고리 ID를 통한 평균 정확도 저장",
           tags=["수어 API"],
           responses={
@@ -414,7 +414,7 @@ async def calculate_voice_accuracy(
 
 
 # 3. 음성 문제 평균 정확도 저장 API
-@app.post("/voice/saveVoiceAccuracy/{user_id}", 
+@app.post("/voice/saveVoiceAccuracy/{user_id}/{category_id}", 
           summary="카테고리 ID를 통한 음성 번역 평균 정확도 저장", 
           tags=["음성 API"],
           responses={
@@ -697,14 +697,14 @@ async def get_quiz(db: Session = Depends(get_db)):
                   }
               }
           })
-async def record_quiz_score(user_id: int, quiz_correct_number: int, db: Session = Depends(get_db)):
+async def record_quiz_score(user_id: int, quiz_data: QuizScoreUpdate, db: Session = Depends(get_db)):
     # MyPage 조회
     my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
     if not my_page:
         raise HTTPException(status_code=404, detail={"message": "MyPage 정보를 찾을 수 없습니다."})
 
     # 퀴즈 맞은 문제 수 업데이트
-    my_page.quiz_correct_number = quiz_correct_number
+    my_page.quiz_correct_number = quiz_data.quiz_correct_number
     db.commit()
 
     return {"message": "퀴즈 점수가 기록되었습니다."}

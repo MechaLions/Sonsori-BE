@@ -119,3 +119,9 @@ class CategoryUpdate(BaseModel):
 
     class Config:
         orm_mode = True
+
+class QuizScoreUpdate(BaseModel):
+    quiz_correct_number: int
+
+class TranslatedTextRequest(BaseModel):
+    translated_text: str
