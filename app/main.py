@@ -1,27 +1,38 @@
-from fastapi import FastAPI, Request, HTTPException, Depends, status
+from fastapi import FastAPI, Request, HTTPException, Depends, status, UploadFile, File
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi_socketio import SocketManager
+#from fastapi_socketio import SocketManager
 from passlib.context import CryptContext
-import mediapipe as mp
+from dotenv import load_dotenv
+#import mediapipe as mp
 import random
+import os
 import numpy as np
 from sqlalchemy.orm import Session
 from .database import engine, get_db, Base
 from .models import User, MyPage, Word, Category  # 데이터베이스 모델들
 from .schemas import UserCreate, UserLogin, UserResponse, WordCreate, WordResponse, CategoryCreate, CategoryResponse, CheckIDRequest  # 스키마
-from tensorflow.keras.models import Sequential  # LSTM 모델
-from tensorflow.keras.layers import LSTM, Dense  # LSTM 레이어
-from sklearn.preprocessing import LabelEncoder  # 정답 텍스트 인코딩
-import joblib  # 모델 로딩을 위한 joblib
-import pandas as pd  # 엑셀 파일 로드용
+#from tensorflow.keras.models import Sequential  # LSTM 모델
+#from tensorflow.keras.layers import LSTM, Dense  # LSTM 레이어
+#from sklearn.preprocessing import LabelEncoder  # 정답 텍스트 인코딩
+#import joblib  # 모델 로딩을 위한 joblib
+#import pandas as pd  # 엑셀 파일 로드용
 
 # 비밀번호 해싱을 위한 설정
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # DB 초기화
 Base.metadata.create_all(bind=engine)
+
+# .env 파일에서 환경 변수 로드
+load_dotenv()
+
+# Hugging Face API URL과 Authorization 토큰 설정
+API_URL = "https://api-inference.huggingface.co/models/kresnik/wav2vec2-large-xlsr-korean"
+HUGGING_FACE_TOKEN = os.getenv("HUGGING_FACE_TOKEN")
+
+headers = {"Authorization": f"Bearer {HUGGING_FACE_TOKEN}"}
 
 tags_metadata = [
     {
@@ -65,6 +76,7 @@ origins = [
     "http://0.0.0.0:8000",
     "http://127.0.0.1:8000",
     "http://localhost:5173",
+    "http://localhost:5500",
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -94,95 +106,6 @@ def verify_password(plain_password, hashed_password):
 """
 수어 인식 API 파트
 """
-# SocketIO 설정
-sio = SocketManager(app=app, cors_allowed_origins=[])
-
-# Mediapipe와 관련된 설정
-mp_holistic = mp.solutions.holistic
-mp_drawing = mp.solutions.drawing_utils
-
-# LSTM 모델 로드 및 초기화
-actions = np.array(['None', '계산', '고맙다', '괜찮다', '기다리다', '나', '네', '다음',
-                    '달다', '더', '도착', '돈', '또', '맵다', '먼저', '무엇', '물', '물음',
-                    '부탁', '사람', '수저', '시간', '아니요', '어디', '얼마', '예약', '오다',
-                    '우리', '음식', '이거', '인기', '있다', '자리', '접시', '제일', '조금',
-                    '주문', '주세요', '짜다', '책', '추천', '화장실', '확인'])
-
-model = Sequential()
-model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(30, 126)))
-model.add(LSTM(128, return_sequences=True, activation='relu'))
-model.add(LSTM(64, return_sequences=False, activation='relu'))
-model.add(Dense(64, activation='relu'))
-model.add(Dense(32, activation='relu'))
-model.add(Dense(actions.shape[0], activation='softmax'))
-
-model.compile(optimizer='Adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
-#model.load_weights("/home/ubuntu/model/actionxhand_data0524_0513.h5")  # 모델 파일 경로
-#model.load_weights("‪C:/Users/user/python/Sign-Language-Translator/actionxhand_data0524_0513.h5")  # 모델 파일 경로
-model.load_weights("/app/models/actionxhand_data0524_0513.h5")
-
-
-# LabelEncoder 및 기타 모델 로드
-#rlf = joblib.load("/home/ubuntu/model/sentence_model.pkl")
-#data = pd.read_excel("/home/ubuntu/model/sentence_data.xlsx", engine='openpyxl') #모델 파일 경료
-#rlf = joblib.load("C:/Users/user/python/Sign-Language-Translator/sentence_model.pkl")
-#data = pd.read_excel("C:/Users/user/python/Sign-Language-Translator/sentence_data.xlsx", engine='openpyxl') #모델 파일 경료
-rlf = joblib.load("/app/models/sentence_model.pkl")
-data = pd.read_excel("/app/models/sentence_data.xlsx", engine='openpyxl')
-
-data_x = data.drop(['sentence'], axis=1)
-data_y = data['sentence']
-le = LabelEncoder()
-le.fit(data['sentence'])
-
-# 소켓 연결 확인 이벤트
-@sio.on('connect')
-async def connect(sid, environ):
-    print(f"Client {sid} connected")
-    await sio.emit('connection_response', {'message': 'Socket connected!'})
-
-# 수어 번역 WebSocket 핸들러
-@sio.on('image')
-async def image(sid, data_image):
-    global sequence, sentence, predictions, count
-    sequence, sentence, predictions = [], [], []
-    count = 0
-    threshold = 0.5
-
-    if data_image == "delete":
-        if len(sentence) != 0:
-            sequence.clear()
-            count = 0
-            delete_word = sentence[-1] + "가 삭제되었습니다."
-            sentence.pop(-1)
-            await sio.emit('delete_back', delete_word)
-        else:
-            await sio.emit('delete_back', "번역된 단어가 없습니다.")
-        return
-
-    # 수어 번역 로직
-    frame = readb64(data_image)
-    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
-        count += 1
-        image, results = mediapipe_detection(frame, holistic)
-        keypoints = extract_keypoints(results)
-        sequence.append(keypoints)
-        if len(sequence) % 30 == 0:
-            res = model.predict(np.expand_dims(sequence, axis=0))[0]
-            if res[np.argmax(res)] > threshold:
-                if len(sentence) > 0 and actions[np.argmax(res)] != 'None' and actions[np.argmax(res)] != sentence[-1]:
-                    sentence.append(actions[np.argmax(res)])
-                else:
-                    sentence.append(actions[np.argmax(res)])
-            if len(sentence) == 5:
-                input_data = make_num_df(make_word_df(*sentence[:5]))
-                y_pred = rlf.predict(input_data)
-                predict_word = le.inverse_transform(y_pred)
-                sentence.clear()
-                await sio.emit('result', predict_word)
-            else:
-                await sio.emit('response_back', sentence[-1])
-
 #수어 번역 텍스트와 정답 텍스트 비교 및 정확도 계산 API
 @app.post("/shadowing/calculateAccuracy",
           summary="수어 번역 텍스트와 정답 텍스트 비교 및 정확도 계산",
@@ -327,6 +250,7 @@ async def get_random_words_from_category(category_id: int, db: Session = Depends
     
     return [{"word_id": word.word_id, "word_text": word.word_text, "sign_url": word.sign_url} for word in random_words]
 
+"""
 #카테고리와 상관없이 5개의 랜덤 단어 반환 API
 @app.get("/quiz/words/random", 
          summary="카테고리와 상관없이 5개 랜덤 단어 반환", 
@@ -353,13 +277,140 @@ async def get_random_words(db: Session = Depends(get_db)):
             for word in random_words
         ]
     }
+"""
 
 """
-카테고리 API
+음성 API 파트
+"""
+def query(filename: str):
+    """Hugging Face API에 음성 파일을 보내고 인식 결과를 반환하는 함수"""
+    with open(filename, "rb") as f:
+        data = f.read()
+    response = requests.post(API_URL, headers=headers, data=data)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="Failed to process voice file")
+    return response.json()
+
+# 1. 특정 카테고리에서 10개 랜덤 음성 단어 반환 API
+@app.get("/voice/{category_id}/words", 
+         summary="특정 카테고리에서 10개 음성 문제 반환", 
+         tags=["음성 API"],
+         responses={
+             200: {
+                 "description": "OK",
+                 "content": {
+                     "application/json": {
+                         "example": {
+                             "words": [
+                                 {"word_id": 1, "word_text": "사과", "answer_voice": "사과"},
+                                 {"word_id": 2, "word_text": "바나나", "answer_voice": "바나나"}
+                             ]
+                         }
+                     }
+                 }
+             },
+             404: {
+                 "description": "NOT FOUND",
+                 "content": {
+                     "application/json": {
+                         "example": {"message": "해당 카테고리에서 단어를 찾을 수 없습니다."}
+                     }
+                 }
+             }
+         })
+async def get_random_voice_words_from_category(category_id: int, db: Session = Depends(get_db)):
+    words = db.query(Word).filter(Word.category_id == category_id).all()
+    if not words:
+        raise HTTPException(status_code=404, detail={"message": "해당 카테고리에서 단어를 찾을 수 없습니다."})
+    
+    random_words = random.sample(words, min(len(words), 10))
+    return {"words": [{"word_id": word.word_id, "word_text": word.word_text, "answer_voice": word.answer_voice} for word in random_words]}
+
+
+# 2. 음성 파일을 받아 음절별 정확도 계산 및 응답 반환 API
+@app.post("/voice/calculateAccuracy/{user_id}/{word_id}", summary="음성 파일을 받아 음절별 정확도 계산")
+async def calculate_voice_accuracy(
+    user_id: int, 
+    word_id: int, 
+    audio_file: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+):
+    """
+    음성 파일을 받아서 해당 word_id의 단어와 비교해 음절별 정확도를 계산하고 반환하는 API
+    """
+    # Word DB에서 word_id에 해당하는 단어 가져오기
+    word = db.query(Word).filter(Word.word_id == word_id).first()
+    if not word:
+        raise HTTPException(status_code=404, detail={"message": "Word 정보를 찾을 수 없습니다."})
+
+    # 정답 텍스트와 올바른 발음 정보
+    correct_text = word.answer_voice.replace(" ", "")  # 공백 제거
+    correct_pronunciation = word.correct_pronunciation
+
+    # 음성 파일을 임시로 저장
+    with open(f"temp_{audio_file.filename}", "wb") as buffer:
+        buffer.write(await audio_file.read())
+    
+    # Hugging Face API로 음성 파일 전송 및 음성 인식 결과 가져오기
+    voice_recognition_result = query(f"temp_{audio_file.filename}")['text'].replace(" ", "")  # 공백 제거
+
+    # 음절별로 비교
+    correct_characters = list(correct_text)  # 정답 텍스트를 음절 단위로 분리
+    recognized_characters = list(voice_recognition_result)  # 음성 인식 결과를 음절 단위로 분리
+    
+    correct_count = sum(1 for i, char in enumerate(recognized_characters) if i < len(correct_characters) and char == correct_characters[i])
+    accuracy = (correct_count / len(correct_characters)) * 100 if correct_characters else 0  # %로 변환
+
+    # MyPage 테이블에서 사용자의 정보 가져와서 정확도 업데이트
+    my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
+    if my_page:
+        my_page.voice_accuracy_sum += accuracy
+        my_page.voice_solved_number += 1
+        db.commit()
+    else:
+        raise HTTPException(status_code=404, detail={"message": "MyPage 정보를 찾을 수 없습니다."})
+
+    # 최종 응답
+    return {
+        "word_id": word_id,
+        "correct_text": correct_text,
+        "correct_pronunciation": correct_pronunciation,  # 옳은 발음 정보
+        "voice_recognition_result": voice_recognition_result,  # 음성 인식 결과 (공백 제거된 결과)
+        "accuracy": int(accuracy)  # 정확도 반환
+    }
+
+
+# 3. 음성 문제 평균 정확도 저장 API
+@app.post("/voice/saveVoiceAccuracy/{user_id}", summary="카테고리 ID를 통한 음성 번역 평균 정확도 저장", tags=["음성 API"])
+async def save_voice_accuracy(user_id: int, category_id: int, db: Session = Depends(get_db)):
+    """
+    카테고리 ID를 받아 해당 유저의 음성 번역 문제 평균 정확도를 계산하고 저장하는 API
+    """
+    # MyPage 테이블에서 사용자 정보 가져오기
+    my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
+    if not my_page:
+        raise HTTPException(status_code=404, detail={"message": "MyPage 정보를 찾을 수 없습니다."})
+
+    if my_page.voice_solved_number > 0:
+        # 평균 정확도 계산 및 저장
+        my_page.voice_accuracy_avg = my_page.voice_accuracy_sum / my_page.voice_solved_number
+        my_page.voice_category_id = category_id
+        my_page.voice_solved_number = 0
+        my_page.voice_accuracy_sum = 0.0
+        db.commit()
+    else:
+        raise HTTPException(status_code=400, detail={"message": "풀이한 문제가 없어 평균을 계산할 수 없습니다."})
+
+    return {"message": "평균 정확도가 성공적으로 업데이트되었습니다."}
+
+
+
+"""
+카테고리 API 파트
 """
 @app.get("/categories", 
          summary="카테고리 전체 목록 조회", 
-         tags=["유저 API"],
+         tags=["카테고리 API"],
          responses={
              200: {
                  "description": "OK",
@@ -386,7 +437,14 @@ async def get_random_words(db: Session = Depends(get_db)):
 async def get_all_categories(db: Session = Depends(get_db)):
     categories = db.query(Category).all()
     if not categories:
-
+        return JSONResponse(status_code=404, content={"message": "카테고리가 없습니다."})
+    
+    # 카테고리 목록을 JSON으로 반환
+    return {"categories": [
+        {"category_id": category.category_id, "category_name": category.category_name, 
+         "description": category.description, "category_image_url": category.category_image_url}
+        for category in categories
+    ]}
         
 """
 퀴즈 API 파트
