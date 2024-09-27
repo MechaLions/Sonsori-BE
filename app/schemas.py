@@ -83,6 +83,7 @@ class WordCreate(BaseModel):
     word_text: str
     sign_url: str  # 추가
     answer_voice: str  # 추가
+    correct_pronunciation: str # 추가
 
 class WordResponse(BaseModel):
     word_id: int

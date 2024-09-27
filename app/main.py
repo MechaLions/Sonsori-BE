@@ -130,6 +130,14 @@ def verify_password(plain_password, hashed_password):
                           "example": {"message": "Word 정보를 찾을 수 없습니다."}
                       }
                   }
+              },
+              422: {
+                  "description": "VALIDATION ERROR",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "필수 필드가 누락되었습니다."}
+                      }
+                  }
               }
           })
 async def calculate_accuracy(user_id: int, word_id: int, translated_text: str, db: Session = Depends(get_db)):
@@ -241,7 +249,15 @@ async def saveShadowingAccuracy(user_id: int, category_id: int, db: Session = De
                          "example": {"message": "해당 카테고리에서 단어를 찾을 수 없습니다."}
                      }
                  }
-             }
+             },
+              422: {
+                  "description": "VALIDATION ERROR",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "필수 필드가 누락되었습니다."}
+                      }
+                  }
+              }
          })
 async def get_random_words_from_category(category_id: int, db: Session = Depends(get_db)):
     words = db.query(Word).filter(Word.category_id == category_id).all()
@@ -318,7 +334,15 @@ def query(filename: str):
                          "example": {"message": "해당 카테고리에서 단어를 찾을 수 없습니다."}
                      }
                  }
-             }
+             },
+              422: {
+                  "description": "VALIDATION ERROR",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "필수 필드가 누락되었습니다."}
+                      }
+                  }
+              }
          })
 async def get_random_voice_words_from_category(category_id: int, db: Session = Depends(get_db)):
     words = db.query(Word).filter(Word.category_id == category_id).all()
@@ -353,6 +377,14 @@ async def get_random_voice_words_from_category(category_id: int, db: Session = D
                   "content": {
                       "application/json": {
                           "example": {"message": "Word 정보를 찾을 수 없습니다."}
+                      }
+                  }
+              },
+              422: {
+                  "description": "VALIDATION ERROR",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "필수 필드가 누락되었습니다."}
                       }
                   }
               }
@@ -434,6 +466,14 @@ async def calculate_voice_accuracy(
                   "content": {
                       "application/json": {
                           "example": {"message": "풀이한 문제가 없어 평균을 계산할 수 없습니다."}
+                      }
+                  }
+              },
+              422: {
+                  "description": "VALIDATION ERROR",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "필수 필드가 누락되었습니다."}
                       }
                   }
               }
@@ -702,7 +742,7 @@ async def record_quiz_score(user_id: int, quiz_correct_number: int, db: Session 
 유저 API 파트
 """
 # 아이디 중복 확인 API (CONFLICT, 409 반환, 422 커스터마이징 추가)
-@app.get("/checkIdDuplicate", 
+@app.post("/checkIdDuplicate", 
          summary="아이디 중복 확인", 
          tags=["유저 API"],
          responses={
@@ -870,7 +910,15 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
                          "example": {"message": "MyPage 정보를 찾을 수 없습니다."}
                      }
                  }
-             }
+             },
+              422: {
+                  "description": "VALIDATION ERROR",
+                  "content": {
+                      "application/json": {
+                          "example": {"message": "필수 필드가 누락되었습니다."}
+                      }
+                  }
+              }
          })
 async def get_mypage(user_id: int, db: Session = Depends(get_db)):
     # 유저 조회
@@ -945,7 +993,7 @@ def create_word(word: WordCreate, db: Session = Depends(get_db)):
           summary="카테고리 추가", 
           tags=["dev API"], 
           responses={
-              201: {
+              200: {
                   "description": "OK",
                   "content": {
                       "application/json": {
