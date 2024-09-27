@@ -83,7 +83,6 @@ class WordCreate(BaseModel):
     word_text: str
     sign_url: str  # 추가
     answer_voice: str  # 추가
-    correct_pronunciation: str # 추가
 
 class WordResponse(BaseModel):
     word_id: int
@@ -91,7 +90,32 @@ class WordResponse(BaseModel):
     word_text: str
     sign_url: str  # 추가
     answer_voice: str  # 추가
-    correct_pronunciation: str # 추가
+
+    class Config:
+        orm_mode = True
+
+class WordUpdate(BaseModel):
+    word_text: str
+    answer_voice: str
+    correct_pronunciation: str
+
+    class Config:
+        orm_mode = True
+
+class WordListResponse(BaseModel):
+    word_id: int
+    category_id: int
+    word_text: str
+    sign_url: str
+    answer_voice: str
+
+    class Config:
+        orm_mode = True
+
+class CategoryUpdate(BaseModel):
+    category_name: str
+    description: str
+    category_image_url: str
 
     class Config:
         orm_mode = True

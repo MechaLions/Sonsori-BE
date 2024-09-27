@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 #from fastapi_socketio import SocketManager
 from passlib.context import CryptContext
 from dotenv import load_dotenv
+import requests
 #import mediapipe as mp
 import random
 import os
@@ -268,43 +269,13 @@ async def get_random_words_from_category(category_id: int, db: Session = Depends
     
     return [{"word_id": word.word_id, "word_text": word.word_text, "sign_url": word.sign_url} for word in random_words]
 
-"""
-#카테고리와 상관없이 5개의 랜덤 단어 반환 API
-@app.get("/quiz/words/random", 
-         summary="카테고리와 상관없이 5개 랜덤 단어 반환", 
-         tags=["수어 API"],
-         responses={
-             200: {
-                 "description": "OK",
-                 "content": {
-                     "application/json": {
-                         "example": [
-                             {"word_id": 1, "word_text": "사과", "sign_url": "http://example.com/sign1"},
-                             {"word_id": 2, "word_text": "바나나", "sign_url": "http://example.com/sign2"}
-                         ]
-                     }
-                 }
-             }
-         })
-async def get_random_words(db: Session = Depends(get_db)):
-    words = db.query(Word).all()
-    random_words = random.sample(words, min(len(words), 5))
-    return {
-        "words": [
-            {"word_id": word.word_id, "word_text": word.word_text, "sign_url": word.sign_url} 
-            for word in random_words
-        ]
-    }
-"""
 
 """
 음성 API 파트
 """
-def query(filename: str):
-    """Hugging Face API에 음성 파일을 보내고 인식 결과를 반환하는 함수"""
-    with open(filename, "rb") as f:
-        data = f.read()
-    response = requests.post(API_URL, headers=headers, data=data)
+def query(file_data: bytes):
+    """Hugging Face API에 음성 파일 데이터를 보내고 인식 결과를 반환하는 함수"""
+    response = requests.post(API_URL, headers=headers, data=file_data)
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail="Failed to process voice file")
     return response.json()
@@ -404,19 +375,26 @@ async def calculate_voice_accuracy(
         raise HTTPException(status_code=404, detail={"message": "Word 정보를 찾을 수 없습니다."})
 
     # 정답 텍스트와 올바른 발음 정보
-    correct_text = word.answer_voice.replace(" ", "")  # 공백 제거
-    correct_pronunciation = word.correct_pronunciation
+    correct_text = word.word_text
+    correct_pronunciation = word.answer_voice.replace(" ", "")  # 공백 제거
 
-    # 음성 파일을 임시로 저장
-    with open(f"temp_{audio_file.filename}", "wb") as buffer:
-        buffer.write(await audio_file.read())
+    # 프론트에서 업로드된 음성 파일을 메모리에서 바로 읽음
+    file_data = await audio_file.read()
     
-    # Hugging Face API로 음성 파일 전송 및 음성 인식 결과 가져오기
-    voice_recognition_result = query(f"temp_{audio_file.filename}")['text'].replace(" ", "")  # 공백 제거
+    # Hugging Face API에 음성 파일 전송
+    voice_recognition_result = query(file_data)
+
+    # API 응답에서 텍스트 처리
+    if "text" in voice_recognition_result:
+        recognized_text = voice_recognition_result["text"].replace(" ", "")  # 공백 제거
+    elif "chunks" in voice_recognition_result:
+        recognized_text = ' '.join([chunk['text'] for chunk in voice_recognition_result['chunks']]).replace(" ", "")
+    else:
+        raise HTTPException(status_code=500, detail="Failed to get recognized text from the API.")
 
     # 음절별로 비교
     correct_characters = list(correct_text)  # 정답 텍스트를 음절 단위로 분리
-    recognized_characters = list(voice_recognition_result)  # 음성 인식 결과를 음절 단위로 분리
+    recognized_characters = list(recognized_text)  # 음성 인식 결과를 음절 단위로 분리
     
     correct_count = sum(1 for i, char in enumerate(recognized_characters) if i < len(correct_characters) and char == correct_characters[i])
     accuracy = (correct_count / len(correct_characters)) * 100 if correct_characters else 0  # %로 변환
@@ -435,7 +413,7 @@ async def calculate_voice_accuracy(
         "word_id": word_id,
         "correct_text": correct_text,
         "correct_pronunciation": correct_pronunciation,  # 옳은 발음 정보
-        "voice_recognition_result": voice_recognition_result,  # 음성 인식 결과 (공백 제거된 결과)
+        "voice_recognition_result": recognized_text,  # 음성 인식 결과 (공백 제거된 결과)
         "accuracy": int(accuracy)  # 정확도 반환
     }
 
@@ -955,7 +933,7 @@ async def get_mypage(user_id: int, db: Session = Depends(get_db)):
 """
 dev API
 """
-@app.post("/words/", 
+@app.post("/dev/words/add", 
           response_model=WordResponse, 
           summary="단어 추가", 
           tags=["dev API"], 
@@ -988,7 +966,7 @@ def create_word(word: WordCreate, db: Session = Depends(get_db)):
     db.refresh(new_word)
     return new_word
 
-@app.post("/categories", 
+@app.post("/dev/categories/add", 
           response_model=CategoryResponse, 
           summary="카테고리 추가", 
           tags=["dev API"], 
@@ -1019,6 +997,136 @@ def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_category)
     return new_category
+
+@app.patch("/dev/words/{word_id}",
+           response_model=WordResponse,
+           summary="단어 수정 (부분 업데이트)",
+           tags=["dev API"],
+           responses={
+               200: {
+                   "description": "OK",
+                   "content": {
+                       "application/json": {
+                           "example": {
+                               "word_id": 1,
+                               "category_id": 1,
+                               "word_text": "사과",
+                               "sign_url": "http://example.com/sign1",
+                               "answer_voice": "사과"
+                           }
+                       }
+                   }
+               },
+               404: {
+                   "description": "NOT FOUND",
+                   "content": {
+                       "application/json": {
+                           "example": {"message": "Word not found"}
+                       }
+                   }
+               },
+               422: {
+                   "description": "VALIDATION ERROR",
+                   "content": {
+                       "application/json": {
+                           "example": {"message": "필수 필드가 누락되었습니다."}
+                       }
+                   }
+               }
+           })
+async def update_word(word_id: int, word_data: WordUpdate, db: Session = Depends(get_db)):
+    word = db.query(Word).filter(Word.word_id == word_id).first()
+    if not word:
+        raise HTTPException(status_code=404, detail={"message": "Word not found"})
+    
+    word.word_text = word_data.word_text
+    word.answer_voice = word_data.answer_voice
+    word.correct_pronunciation = word_data.correct_pronunciation
+
+    db.commit()
+    db.refresh(word)
+    return word
+
+@app.get("/dev/words/",
+         response_model=List[WordListResponse],
+         summary="단어 전체 목록 조회",
+         tags=["dev API"],
+         responses={
+             200: {
+                 "description": "OK",
+                 "content": {
+                     "application/json": {
+                         "example": [
+                             {
+                                 "word_id": 1,
+                                 "category_id": 1,
+                                 "word_text": "사과",
+                                 "sign_url": "http://example.com/sign1",
+                                 "answer_voice": "사과"
+                             },
+                             {
+                                 "word_id": 2,
+                                 "category_id": 2,
+                                 "word_text": "바나나",
+                                 "sign_url": "http://example.com/sign2",
+                                 "answer_voice": "바나나"
+                             }
+                         ]
+                     }
+                 }
+             }
+         })
+async def get_all_words(db: Session = Depends(get_db)):
+    words = db.query(Word).all()
+    return words
+
+@app.patch("/dev/categories/{category_id}",
+           response_model=CategoryResponse,
+           summary="카테고리 수정",
+           tags=["dev API"],
+           responses={
+               200: {
+                   "description": "OK",
+                   "content": {
+                       "application/json": {
+                           "example": {
+                               "category_id": 1,
+                               "category_name": "과일",
+                               "description": "과일 관련 단어 모음",
+                               "category_image_url": "http://example.com/image1"
+                           }
+                       }
+                   }
+               },
+               404: {
+                   "description": "NOT FOUND",
+                   "content": {
+                       "application/json": {
+                           "example": {"message": "Category not found"}
+                       }
+                   }
+               },
+               422: {
+                   "description": "VALIDATION ERROR",
+                   "content": {
+                       "application/json": {
+                           "example": {"message": "필수 필드가 누락되었습니다."}
+                       }
+                   }
+               }
+           })
+async def update_category(category_id: int, category_data: CategoryUpdate, db: Session = Depends(get_db)):
+    category = db.query(Category).filter(Category.category_id == category_id).first()
+    if not category:
+        raise HTTPException(status_code=404, detail={"message": "Category not found"})
+    
+    category.category_name = category_data.category_name
+    category.description = category_data.description
+    category.category_image_url = category_data.category_image_url
+
+    db.commit()
+    db.refresh(category)
+    return category
 
 if __name__ == "__main__":
     import uvicorn

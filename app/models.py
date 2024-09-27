@@ -40,7 +40,7 @@ class Category(Base):
     category_id = Column(Integer, primary_key=True, index=True)
     category_name = Column(String(255), nullable=False)
     description = Column(String(255), nullable=False)
-    category_image_url = Column(String(255), nullable=False)
+    category_image_url = Column(String(255), nullable=True)
     
     sign_quiz = relationship("SignQuiz", back_populates="category")
     voice_quiz = relationship("VoiceQuiz", back_populates="category")
@@ -73,6 +73,5 @@ class Word(Base):
     word_text = Column(String(255), nullable=False)
     sign_url = Column(String(255), nullable=True)  # 추가
     answer_voice = Column(String(255), nullable=True)  # 추가
-    correct_pronunciation = Column(String(255), nullable=True) # 추가
     
     category = relationship("Category")
