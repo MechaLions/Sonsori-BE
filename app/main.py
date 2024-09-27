@@ -225,10 +225,12 @@ async def saveShadowingAccuracy(user_id: int, category_id: int, db: Session = De
                  "description": "OK",
                  "content": {
                      "application/json": {
-                         "words": [
+                         "example": {
+                            "words": [
                                  {"word_id": 1, "word_text": "사과", "sign_url": "http://example.com/sign1"},
                                  {"word_id": 2, "word_text": "바나나", "sign_url": "http://example.com/sign2"}
-                        ]
+                            ]
+                         }
                      }
                  }
              },
@@ -503,7 +505,115 @@ async def get_all_categories(db: Session = Depends(get_db)):
 """
 퀴즈 API 파트
 """
-@app.get("/quiz", summary="퀴즈 10개 묶음 받는 API", tags=["퀴즈 API"])
+@app.get("/quiz", 
+         summary="퀴즈 10개 묶음 받는 API", 
+         tags=["퀴즈 API"],
+         responses={
+             200: {
+                 "description": "퀴즈를 성공적으로 가져왔습니다.",
+                 "content": {
+                     "application/json": {
+                         "example": {
+                             "quiz": [
+                                 {
+                                     "type": "sign_language",
+                                     "word_id": 1,
+                                     "correct_text": "사과",
+                                     "sign_url": "http://example.com/sign1"
+                                 },
+                                 {
+                                     "type": "sign_language",
+                                     "word_id": 2,
+                                     "correct_text": "바나나",
+                                     "sign_url": "http://example.com/sign2"
+                                 },
+                                 {
+                                     "type": "sign_language",
+                                     "word_id": 3,
+                                     "correct_text": "수박",
+                                     "sign_url": "http://example.com/sign3"
+                                 },
+                                 {
+                                     "type": "sign_language",
+                                     "word_id": 4,
+                                     "correct_text": "포도",
+                                     "sign_url": "http://example.com/sign4"
+                                 },
+                                 {
+                                     "type": "sign_language",
+                                     "word_id": 5,
+                                     "correct_text": "참외",
+                                     "sign_url": "http://example.com/sign5"
+                                 },
+                                 {
+                                     "type": "multiple_choice",
+                                     "word_id": 6,
+                                     "correct_text": "컴퓨터",
+                                     "options": [
+                                         "모니터",
+                                         "키보드",
+                                         "마우스",
+                                         "컴퓨터"
+                                     ]
+                                 },
+                                 {
+                                     "type": "multiple_choice",
+                                     "word_id": 7,
+                                     "correct_text": "책상",
+                                     "options": [
+                                         "의자",
+                                         "책상",
+                                         "소파",
+                                         "침대"
+                                     ]
+                                 },
+                                 {
+                                     "type": "multiple_choice",
+                                     "word_id": 8,
+                                     "correct_text": "핸드폰",
+                                     "options": [
+                                         "핸드폰",
+                                         "노트북",
+                                         "태블릿",
+                                         "카메라"
+                                     ]
+                                 },
+                                 {
+                                     "type": "multiple_choice",
+                                     "word_id": 9,
+                                     "correct_text": "자동차",
+                                     "options": [
+                                         "자동차",
+                                         "자전거",
+                                         "버스",
+                                         "오토바이"
+                                     ]
+                                 },
+                                 {
+                                     "type": "multiple_choice",
+                                     "word_id": 10,
+                                     "correct_text": "바다",
+                                     "options": [
+                                         "강",
+                                         "호수",
+                                         "바다",
+                                         "산"
+                                     ]
+                                 }
+                             ]
+                         }
+                     }
+                 }
+             },
+             404: {
+                 "description": "퀴즈를 위한 충분한 단어가 없습니다.",
+                 "content": {
+                     "application/json": {
+                         "example": {"message": "퀴즈 문제를 위한 단어가 충분하지 않습니다."}
+                     }
+                 }
+             }
+         })
 async def get_quiz(db: Session = Depends(get_db)):
     # 수어 문제 5개 선택 (sign_url이 존재하는 단어)
     sign_language_words = db.query(Word).filter(Word.sign_url.isnot(None)).all()
