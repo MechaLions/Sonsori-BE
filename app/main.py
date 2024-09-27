@@ -2,23 +2,18 @@ from fastapi import FastAPI, Request, HTTPException, Depends, status, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-#from fastapi_socketio import SocketManager
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 import requests
-#import mediapipe as mp
 import random
 import os
 import numpy as np
 from sqlalchemy.orm import Session
 from .database import engine, get_db, Base
 from .models import User, MyPage, Word, Category  # 데이터베이스 모델들
-from .schemas import UserCreate, UserLogin, UserResponse, WordCreate, WordResponse, CategoryCreate, CategoryResponse, CheckIDRequest  # 스키마
-#from tensorflow.keras.models import Sequential  # LSTM 모델
-#from tensorflow.keras.layers import LSTM, Dense  # LSTM 레이어
-#from sklearn.preprocessing import LabelEncoder  # 정답 텍스트 인코딩
-#import joblib  # 모델 로딩을 위한 joblib
-#import pandas as pd  # 엑셀 파일 로드용
+from .schemas import UserCreate, UserLogin, UserResponse, WordCreate, WordResponse, CategoryCreate, CategoryResponse, CheckIDRequest, WordUpdate, WordListResponse, CategoryUpdate  # 스키마
+from typing import List
+
 
 # 비밀번호 해싱을 위한 설정
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -1000,7 +995,7 @@ def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
 
 @app.patch("/dev/words/{word_id}",
            response_model=WordResponse,
-           summary="단어 수정 (부분 업데이트)",
+           summary="단어 수정",
            tags=["dev API"],
            responses={
                200: {
@@ -1041,7 +1036,7 @@ async def update_word(word_id: int, word_data: WordUpdate, db: Session = Depends
     
     word.word_text = word_data.word_text
     word.answer_voice = word_data.answer_voice
-    word.correct_pronunciation = word_data.correct_pronunciation
+    word.sign_url = word_data.sign_url
 
     db.commit()
     db.refresh(word)

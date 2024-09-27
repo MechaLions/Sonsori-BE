@@ -96,8 +96,8 @@ class WordResponse(BaseModel):
 
 class WordUpdate(BaseModel):
     word_text: str
+    sign_url: str
     answer_voice: str
-    correct_pronunciation: str
 
     class Config:
         orm_mode = True
