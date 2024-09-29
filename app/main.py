@@ -98,7 +98,6 @@ def hash_password(password: str):
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-
 """
 수어 인식 API 파트
 """
