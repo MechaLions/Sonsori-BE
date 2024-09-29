@@ -15,13 +15,13 @@ from .schemas import UserCreate, UserLogin, UserResponse, WordCreate, WordRespon
 from typing import List
 
 
-# 비밀번호 해싱을 위한 설정
+#비밀번호 해싱을 위한 설정
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# DB 초기화
+#DB 초기화
 Base.metadata.create_all(bind=engine)
 
-# .env 파일에서 환경 변수 로드
+#.env 파일에서 환경 변수 로드
 load_dotenv()
 
 # Hugging Face API URL과 Authorization 토큰 설정
