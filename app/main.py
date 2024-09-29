@@ -159,7 +159,7 @@ async def calculate_accuracy(user_id: int, word_id: int, request: TranslatedText
     return {
         "word_id": word_id,
         "correct_text": correct_text,
-        "translated_text": translated_text,
+        "translated_text": translated_words,
         "accuracy": int(accuracy)  # 소수점 제거하여 정수로 반환
     }
 
