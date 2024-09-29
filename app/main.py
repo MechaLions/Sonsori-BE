@@ -21,7 +21,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 #DB 초기화
 Base.metadata.create_all(bind=engine)
 
-#.env 파일에서 환경 변수 로드
+#.env 파일서 환경 변수 로드
 load_dotenv()
 
 # Hugging Face API URL과 Authorization 토큰 설정
