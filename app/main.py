@@ -112,6 +112,7 @@ def verify_password(plain_password, hashed_password):
                       "application/json": {
                           "example": {
                               "word_id": 1,
+                              "correct_text": "안녕하세요",
                               "translated_text": "안녕하세요",
                               "accuracy": 100
                           }
@@ -159,7 +160,7 @@ async def calculate_accuracy(user_id: int, word_id: int, request: TranslatedText
     return {
         "word_id": word_id,
         "correct_text": correct_text,
-        "translated_text": translated_words,
+        "translated_text": request.translated_text,
         "accuracy": int(accuracy)  # 소수점 제거하여 정수로 반환
     }
 
