@@ -652,6 +652,7 @@ async def get_quiz(db: Session = Depends(get_db)):
             "type": "multiple_choice",
             "word_id": correct_word.word_id,
             "correct_text": correct_word.word_text,
+            "sign_url": correct_word.sign_url,
             "options": [option.word_text for option in options]
         })
 
