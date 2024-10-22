@@ -656,14 +656,14 @@ async def get_quiz(db: Session = Depends(get_db)):
         })
 
     # 최종 퀴즈 반환 (5개 수어 문제 + 5개 객관식 문제)
-    quiz = [
+    quiz = multiple_choice_questions + [
         {
             "type": "sign_language",
             "word_id": word.word_id,
             "correct_text": word.word_text,
             "sign_url": word.sign_url
         } for word in sign_language_questions
-    ] + multiple_choice_questions
+    ]
 
     return {"quiz": quiz}
 
