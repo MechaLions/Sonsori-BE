@@ -4,6 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from passlib.context import CryptContext
 from dotenv import load_dotenv
+<<<<<<< HEAD
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 from pydub import AudioSegment
 import torch
@@ -15,6 +16,11 @@ import subprocess
 import os
 import io
 import torchaudio
+=======
+import requests
+import random
+import os
+>>>>>>> a336a91f85c96745157e0cec4e87542f2d63592f
 import numpy as np
 from sqlalchemy.orm import Session
 from .database import engine, get_db, Base
@@ -32,6 +38,15 @@ Base.metadata.create_all(bind=engine)
 #.env 파일서 환경 변수 로드
 load_dotenv()
 
+<<<<<<< HEAD
+=======
+# Hugging Face API URL과 Authorization 토큰 설정
+API_URL = "https://api-inference.huggingface.co/models/kresnik/wav2vec2-large-xlsr-korean"
+HUGGING_FACE_TOKEN = os.getenv("HUGGING_FACE_TOKEN")
+
+headers = {"Authorization": f"Bearer {HUGGING_FACE_TOKEN}"}
+
+>>>>>>> a336a91f85c96745157e0cec4e87542f2d63592f
 tags_metadata = [
     {
         "name": "유저 API",
@@ -153,7 +168,11 @@ async def calculate_accuracy(user_id: int, word_id: int, request: TranslatedText
     # 사용자 MyPage 정보 업데이트
     my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
     if my_page:
+<<<<<<< HEAD
         my_page.shadowing_accuracy_sum += int(accuracy)
+=======
+        my_page.shadowing_accuracy_sum += accuracy
+>>>>>>> a336a91f85c96745157e0cec4e87542f2d63592f
         my_page.shadowing_solved_number += 1
         db.commit()
     else:
@@ -209,7 +228,11 @@ async def saveShadowingAccuracy(user_id: int, category_id: int, db: Session = De
     my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
     if my_page:
         if my_page.shadowing_solved_number > 0:
+<<<<<<< HEAD
             my_page.shadowing_accuracy_avg = int(my_page.shadowing_accuracy_sum / my_page.shadowing_solved_number)
+=======
+            my_page.shadowing_accuracy_avg = my_page.shadowing_accuracy_sum / my_page.shadowing_solved_number
+>>>>>>> a336a91f85c96745157e0cec4e87542f2d63592f
             my_page.shadowing_category_id = category_id
             my_page.shadowing_solved_number = 0
             my_page.shadowing_accuracy_sum = 0.0
@@ -313,6 +336,7 @@ async def get_random_voice_words_from_category(category_id: int, db: Session = D
     random_words = random.sample(words, min(len(words), 10))
     return {"words": [{"word_id": word.word_id, "word_text": word.word_text, "answer_voice": word.answer_voice} for word in random_words]}
 
+
 # 2. 음성 파일을 받아 음절별 정확도 계산 및 응답 반환 API
 processor = Wav2Vec2Processor.from_pretrained("/app/voice_model/")
 model = Wav2Vec2ForCTC.from_pretrained("/app/voice_model/")
@@ -362,6 +386,7 @@ def query_local_model(file_data: bytes, file_extension: str):
     
     return transcription
     
+# 2. 음성 파일을 받아 음절별 정확도 계산 및 응답 반환 API
 @app.post("/voice/calculateAccuracy/{user_id}/{word_id}", 
           summary="음성 파일을 받아 음절별 정확도 계산",
           tags=["음성 API"],
@@ -1079,6 +1104,7 @@ async def update_word(word_id: int, word_data: WordUpdate, db: Session = Depends
     db.commit()
     db.refresh(word)
     return word
+
 
 @app.get("/dev/words",
          response_model=List[WordListResponse],
