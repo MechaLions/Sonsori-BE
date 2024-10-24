@@ -1,0 +1,2 @@
+*.py text eol=lf
+voice_model/model.safetensors filter=lfs diff=lfs merge=lfs -text
