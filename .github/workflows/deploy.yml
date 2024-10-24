@@ -1,6 +1,5 @@
 name: FastAPI CI/CD
 
-
 on:
   push:
     branches: [ "main" ]
@@ -11,6 +10,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: Install Git LFS
+      run: |
+        sudo apt-get update
+        sudo apt-get install git-lfs
+        git lfs install
+
+    - name: Pull model file using Git LFS
+      run: |
+        git lfs pull --include="voice_model/model.safetensors"
 
     - name: Create .env file
       run: |
@@ -56,4 +65,6 @@ jobs:
           docker run -d -p 8000:8000 \
           -v /root/my-proj/resources/images:/app/media \
           -v /root/my-proj/resources/static:/app/static \
+          --memory="2g" --memory-swap="4g" \
           --name fastapi-app ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKERHUB_REPONAME }}
+
