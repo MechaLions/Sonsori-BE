@@ -1,0 +1,8 @@
+mecalions/
+test/
+models/
+webSocket/
+app/.ipynb_checkpoints
+.ipynb_checkpoints/
+.env
+       
