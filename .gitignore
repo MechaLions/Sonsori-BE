@@ -2,7 +2,8 @@ mecalions/
 test/
 models/
 webSocket/
-app/.ipynb_checkpoints
+app/.ipynb_checkpoints/
+app/__pycache__/
 .ipynb_checkpoints/
 .env
        
