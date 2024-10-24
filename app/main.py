@@ -4,7 +4,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from passlib.context import CryptContext
 from dotenv import load_dotenv
-<<<<<<< HEAD
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 from pydub import AudioSegment
 import torch
@@ -16,11 +15,6 @@ import subprocess
 import os
 import io
 import torchaudio
-=======
-import requests
-import random
-import os
->>>>>>> a336a91f85c96745157e0cec4e87542f2d63592f
 import numpy as np
 from sqlalchemy.orm import Session
 from .database import engine, get_db, Base
@@ -38,15 +32,6 @@ Base.metadata.create_all(bind=engine)
 #.env 파일서 환경 변수 로드
 load_dotenv()
 
-<<<<<<< HEAD
-=======
-# Hugging Face API URL과 Authorization 토큰 설정
-API_URL = "https://api-inference.huggingface.co/models/kresnik/wav2vec2-large-xlsr-korean"
-HUGGING_FACE_TOKEN = os.getenv("HUGGING_FACE_TOKEN")
-
-headers = {"Authorization": f"Bearer {HUGGING_FACE_TOKEN}"}
-
->>>>>>> a336a91f85c96745157e0cec4e87542f2d63592f
 tags_metadata = [
     {
         "name": "유저 API",
@@ -90,6 +75,8 @@ origins = [
     "http://127.0.0.1:8000",
     "http://localhost:5173",
     "http://localhost:5500",
+    "https://sonsori.web.app/",
+    "https://sonsori.web.app",
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -168,11 +155,7 @@ async def calculate_accuracy(user_id: int, word_id: int, request: TranslatedText
     # 사용자 MyPage 정보 업데이트
     my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
     if my_page:
-<<<<<<< HEAD
         my_page.shadowing_accuracy_sum += int(accuracy)
-=======
-        my_page.shadowing_accuracy_sum += accuracy
->>>>>>> a336a91f85c96745157e0cec4e87542f2d63592f
         my_page.shadowing_solved_number += 1
         db.commit()
     else:
@@ -228,11 +211,7 @@ async def saveShadowingAccuracy(user_id: int, category_id: int, db: Session = De
     my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
     if my_page:
         if my_page.shadowing_solved_number > 0:
-<<<<<<< HEAD
             my_page.shadowing_accuracy_avg = int(my_page.shadowing_accuracy_sum / my_page.shadowing_solved_number)
-=======
-            my_page.shadowing_accuracy_avg = my_page.shadowing_accuracy_sum / my_page.shadowing_solved_number
->>>>>>> a336a91f85c96745157e0cec4e87542f2d63592f
             my_page.shadowing_category_id = category_id
             my_page.shadowing_solved_number = 0
             my_page.shadowing_accuracy_sum = 0.0
