@@ -2,6 +2,7 @@ mecalions/
 test/
 models/
 webSocket/
+before_sign/
 app/.ipynb_checkpoints/
 app/__pycache__/
 .ipynb_checkpoints/

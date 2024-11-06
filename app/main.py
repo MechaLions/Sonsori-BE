@@ -416,7 +416,7 @@ async def calculate_voice_accuracy(
         raise HTTPException(status_code=404, detail={"message": "Word 정보를 찾을 수 없습니다."})
 
     # 정답 텍스트와 올바른 발음 정보
-    correct_text = word.word_text
+    correct_text = word.answer_voice
     correct_pronunciation = word.answer_voice.replace(" ", "")  # 공백 제거
 
     # 프론트에서 업로드된 음성 파일을 메모리에서 바로 읽음
