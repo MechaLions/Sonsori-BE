@@ -150,7 +150,7 @@ async def calculate_accuracy(user_id: int, word_id: int, request: TranslatedText
     translated_words = request.translated_text.split(" ")
     
     correct_count = sum(1 for word in translated_words if word in correct_words)
-    accuracy = (correct_count / len(correct_words)) * 100 if correct_words else 0  # %로 변환
+    accuracy = (correct_count / len(translated_words)) * 100 if correct_words else 0  # %로 변환
 
     # 사용자 MyPage 정보 업데이트
     my_page = db.query(MyPage).filter(MyPage.user_id == user_id).first()
@@ -425,8 +425,9 @@ async def calculate_voice_accuracy(
     # 파일 확장자를 확인
     file_extension = audio_file.filename.split(".")[-1].lower()
 
-    # Use the local model to recognize the audio
+    # 정답 텍스트 길이만큼 음성 인식 결과 자르기
     recognized_text = query_local_model(file_data, file_extension).replace(" ", "")  # 공백 제거
+    trimmed_recognized_text = recognized_text[:len(correct_pronunciation)]
 
     # 음절별로 비교
     correct_characters = list(correct_text)  # 정답 텍스트를 음절 단위로 분리
@@ -449,7 +450,7 @@ async def calculate_voice_accuracy(
         "word_id": word_id,
         "correct_text": correct_text,
         "correct_pronunciation": correct_pronunciation,  # 옳은 발음 정보
-        "voice_recognition_result": recognized_text,  # 음성 인식 결과 (공백 제거된 결과)
+        "voice_recognition_result": trimmed_recognized_text,  # 음성 인식 결과 (공백 제거된 결과)
         "accuracy": int(accuracy)  # 정확도 반환
     }
 
